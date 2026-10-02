@@ -4,6 +4,7 @@
 import { db, devices, getSetting, messages, setSetting } from '../db.js';
 import { normalizePhone } from '../phone.js';
 import { render } from '../template.js';
+import { emit } from '../events.js';
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS cs_agents (
@@ -171,7 +172,9 @@ export async function register({ router, wa, isEnabled }) {
     if (context !== 'none' && !lines.length) lines = [msg.body ?? msg.text ?? ''];
     for (const t of lines) if (t) note(ticket.id, t, 'in', ticket.name);
     tryAssign(ticket, { announce });
-    return ticketById(ticket.id);
+    const t = ticketById(ticket.id);
+    emitTicket('opened', t, { source });
+    return t;
   }
 
   /** Setelah CS selesai, Chat Bot & AI boleh menjawab chat ini lagi (lepas jeda serah-ke-admin). */
@@ -181,11 +184,20 @@ export async function register({ router, wa, isEnabled }) {
     if (has('ai_pauses')) db.prepare('DELETE FROM ai_pauses WHERE chat_jid = ? AND device_id = ?').run(ticket.chat_jid, ticket.device_id);
   }
 
+  function emitTicket(action, t, extra) {
+    const agent = t.agent_id ? agentById(t.agent_id) : null;
+    emit('cs.ticket', {
+      deviceId: t.device_id, action, ticketId: t.id, chatJid: t.chat_jid, phone: t.phone, name: t.name,
+      agent: agent ? { id: agent.id, name: agent.name } : null, ...extra,
+    });
+  }
+
   function closeTicket(ticket, reason, { notifyCustomer = false, by = '' } = {}) {
     if (ticket.status !== 'open') return;
     db.prepare("UPDATE cs_tickets SET status = 'closed', closed_at = datetime('now'), close_reason = ? WHERE id = ?").run(reason, ticket.id);
     note(ticket.id, `Ditutup${by ? ` oleh ${by}` : ''} (${reason})`);
     resumeBots(ticket);
+    emitTicket('closed', ticket, { reason, by });
     const s = loadSettings();
     if (notifyCustomer && s.closeText) toCustomer(ticket, render(s.closeText, vars(ticket, agentById(ticket.agent_id))), by || 'Sistem');
     const agent = ticket.agent_id ? agentById(ticket.agent_id) : null;

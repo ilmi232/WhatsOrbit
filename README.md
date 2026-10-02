@@ -206,6 +206,27 @@ Menu **Group Greeter** (modul `src/modules/greeter.js`).
 - Peringatan kalau grup hanya mengizinkan admin mengirim pesan dan nomor
   sekolah bukan admin. Masuknya nomor sekolah sendiri tidak disapa.
 
+## Webhook
+
+Menu **Webhook** (modul `src/modules/webhook.js`). Meneruskan peristiwa WhatsOrbit
+ke aplikasi lain (SIAKAD, n8n, Apps Script, dll.) sebagai `POST` JSON.
+
+- Banyak URL penerima; masing-masing memilih **peristiwa** dan **device** sendiri:
+  `message.incoming` (opsional termasuk grup), `message.status` (terkirim/gagal),
+  `device.status` (tersambung/terputus/logout/QR), `group.participants`,
+  `lead.created`, `cs.ticket` (dibuka/ditutup).
+- Format: `{ id, event, timestamp, device: {id,name,phone}, data }`.
+- **Tanda tangan HMAC-SHA256** per URL: header `X-WhatsOrbit-Signature: sha256=hex(HMAC(secret, timestamp + "." + body))`,
+  plus `X-WhatsOrbit-Event`, `X-WhatsOrbit-Delivery`, `X-WhatsOrbit-Timestamp`.
+  Contoh verifikasi Node/PHP/Python/Apps Script ada di halaman Webhook.
+- Sukses = HTTP 2xx dalam 10 detik. Gagal → **dicoba ulang otomatis** hingga 6×
+  (30 dtk, 2 mnt, 10 mnt, 30 mnt, 2 jam, 6 jam). Respons `410 Gone` atau 25 kegagalan
+  beruntun → URL dijeda otomatis.
+- **Log pengiriman** (payload, kode HTTP, respons, durasi) disimpan 14 hari, dengan
+  tombol **Kirim ulang** dan **Tes kirim**.
+- Opsional **balas lewat respons**: penerima menjawab `{"reply":"teks"}` →
+  WhatsOrbit membalas pengirim pesan masuk tersebut.
+
 ## Customer Service
 
 Menu **Customer Service** (modul `src/modules/cs.js`).

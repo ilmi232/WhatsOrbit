@@ -27,6 +27,7 @@ const MENU = [
   { key: 'birthday', label: 'Ulang Tahun', icon: 'cake', feature: 'birthday', sub: 'Ucapan otomatis dari data Kontak' },
   { group: 'Integrasi' },
   { key: 'widget', label: 'Chat Widget', icon: 'chat', feature: 'widget', sub: 'Tombol WhatsApp untuk website sekolah' },
+  { key: 'webhook', label: 'Webhook', icon: 'webhook', feature: 'webhook', sub: 'Kirim peristiwa WhatsOrbit ke aplikasi lain' },
   { key: 'api', label: 'Dokumentasi API', icon: 'code', feature: 'api', sub: 'Kirim pesan dari aplikasi lain' },
   { group: 'Pengaturan' },
   { key: 'devices', label: 'Device', icon: 'device', sub: 'Nomor WhatsApp yang tersambung' },

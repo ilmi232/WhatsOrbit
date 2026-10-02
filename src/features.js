@@ -96,6 +96,13 @@ export const FEATURES = [
     load: () => import('./modules/widget.js'),
   },
   {
+    key: 'webhook',
+    name: 'Webhook',
+    description: 'Teruskan pesan masuk, status kirim, status device, anggota grup, lead & tiket CS ke aplikasi lain (bertanda tangan, dengan kirim ulang otomatis).',
+    default: true,
+    load: () => import('./modules/webhook.js'),
+  },
+  {
     key: 'formScript',
     name: 'Generator Script Google Form',
     description: 'Membuat kode Apps Script siap tempel untuk auto-reply Google Form.',

@@ -9,6 +9,7 @@ import * as wa from './wa.js';
 import * as features from './features.js';
 import * as backup from './backup.js';
 import * as antiban from './antiban.js';
+import { emit } from './events.js';
 
 if (!ADMIN_PASSWORD) {
   console.error('ADMIN_PASSWORD belum diisi. Salin .env.example menjadi .env lalu isi password admin.');
@@ -37,7 +38,10 @@ const hooks = { lead: null };
 function saveLead(device, lead, fallbackPhone) {
   if (!lead || typeof lead !== 'object' || !hooks.lead || !features.isEnabled('leads')) return null;
   try {
-    return hooks.lead({ device, lead: { ...lead, phone: lead.phone ?? fallbackPhone } });
+    const data = { ...lead, phone: lead.phone ?? fallbackPhone };
+    const r = hooks.lead({ device, lead: data });
+    if (r && !r.error) emit('lead.created', { deviceId: device.id, lead: data, contactId: r.contactId, isNew: r.isNew, group: r.group });
+    return r;
   } catch (err) {
     wa.logger.warn({ err: err.message }, 'gagal simpan lead');
     return { error: err.message };
@@ -442,6 +446,7 @@ admin.use('/chatbots', features.requireFeature('chatbot'), features.featureRoute
 admin.use('/aibot', features.requireFeature('aibot'), features.featureRouter('aibot'));
 admin.use('/cs', features.requireFeature('cs'), features.featureRouter('cs'));
 admin.use('/webwa', features.requireFeature('webwa'), features.featureRouter('webwa'));
+admin.use('/webhooks', features.requireFeature('webhook'), features.featureRouter('webhook'));
 admin.use('/greeter', features.requireFeature('greeter'), features.featureRouter('greeter'));
 admin.use('/autoreply', features.requireFeature('autoreply'), features.featureRouter('autoreply'));
 

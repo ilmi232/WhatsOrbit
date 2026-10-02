@@ -12,6 +12,24 @@ import path from 'node:path';
 import { MAX_ATTEMPTS, SEND_DELAY_MAX_MS, SEND_DELAY_MIN_MS, SESSIONS_DIR } from './config.js';
 import { devices, messages } from './db.js';
 import * as antiban from './antiban.js';
+import { bus, emit } from './events.js';
+
+/** Peristiwa status device (untuk Webhook dll.). */
+function emitStatus(deviceId, status, extra = {}) {
+  const d = devices.get(deviceId);
+  emit('device.status', { deviceId, status, phone: d?.phone ?? null, ...extra });
+}
+
+/** Status akhir pesan antrean (sent/failed); percobaan ulang yang masih pending tidak dipancarkan. */
+function emitMessageStatus(deviceId, msgId, waId) {
+  if (!bus.listenerCount('message.status')) return;
+  const m = messages.get(msgId);
+  if (!m || m.status === 'pending') return;
+  emit('message.status', {
+    deviceId, id: m.id, waId: waId ?? m.wa_id ?? null, status: m.status, to: m.to_number,
+    kind: m.kind ?? 'api', body: m.body, error: m.error ?? null, attempts: m.attempts,
+  });
+}
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'warn' });
 const waLogger = logger.child({ module: 'baileys' }, { level: process.env.BAILEYS_LOG_LEVEL || 'silent' });
@@ -94,11 +112,12 @@ export async function startDevice(id) {
         if (ownHandlers.length) queueOwnMessage(id, sock, m);
         continue;
       }
-      if (type !== 'notify' || !incomingHandlers.length) continue;
+      if (type !== 'notify' || (!incomingHandlers.length && !bus.listenerCount('message.incoming'))) continue;
       try {
         const msg = await normalizeIncoming(id, sock, m);
         if (!msg) continue;
         for (const h of incomingHandlers) await h.handle(msg);
+        emit('message.incoming', msg);
       } catch (err) {
         logger.warn({ id, err: err?.message }, 'gagal memproses pesan masuk');
       }
@@ -107,7 +126,7 @@ export async function startDevice(id) {
 
   // Anggota grup masuk/keluar -> modul Group Greeter
   sock.ev.on('group-participants.update', async (u) => {
-    if (!groupHandlers.length) return;
+    if (!groupHandlers.length && !bus.listenerCount('group.participants')) return;
     try {
       const me = myIds(sock);
       const participants = (u.participants ?? [])
@@ -121,6 +140,7 @@ export async function startDevice(id) {
       if (!participants.length) return;
       const ev = { deviceId: id, groupJid: u.id, action: u.action, participants, author: u.authorPn ?? u.author ?? null };
       for (const h of groupHandlers) await h(ev);
+      emit('group.participants', ev);
     } catch (err) {
       logger.warn({ id, err: err?.message }, 'gagal memproses peristiwa grup');
     }
@@ -130,11 +150,13 @@ export async function startDevice(id) {
     if (e.sock !== sock) return; // socket lama, abaikan
 
     if (qr) {
+      if (e.status !== 'qr') emitStatus(id, 'qr');
       e.status = 'qr';
       e.qr = await QRCode.toDataURL(qr, { margin: 1, width: 280 });
     }
 
     if (connection === 'open') {
+      emitStatus(id, 'connected');
       e.status = 'connected';
       e.qr = null;
       e.retries = 0;
@@ -172,6 +194,9 @@ export async function startDevice(id) {
         e.status = 'connecting';
         const delay = Math.min(60_000, 2_000 * 2 ** e.retries++);
         e.retryTimer = setTimeout(() => startDevice(id), delay);
+      }
+      if (code !== DisconnectReason.restartRequired) {
+        emitStatus(id, e.status === 'connecting' ? 'disconnected' : e.status, { reason: e.lastError, code: code ?? null, reconnecting: e.status === 'connecting' });
       }
     }
   });
@@ -412,10 +437,12 @@ export async function drainQueue(id) {
         try {
           const waId = await sendText(sock, msg.to_jid || msg.to_number, msg.body, msg.extra ? JSON.parse(msg.extra) : null);
           messages.markSent(msg.id, waId);
+          emitMessageStatus(id, msg.id, waId);
         } catch (err) {
           if (err instanceof NotOnWhatsApp) messages.markFailed(msg.id, err.message);
           else messages.markAttemptFailed(msg.id, String(err?.message ?? err), MAX_ATTEMPTS);
           logger.warn({ id, msgId: msg.id, err: err?.message }, 'gagal kirim');
+          emitMessageStatus(id, msg.id, null);
         }
         // Pesan yang kita mulai (Kirim Pesan, Ulang Tahun) memakai jeda lebih panjang
         if (antiban.INITIATED.includes(msg.kind)) {
