@@ -212,17 +212,6 @@ export function barSeries(rows, { h = 220 } = {}) {
 }
 
 /** Donut persentase (untuk tile berwarna). */
-export function donut(pct, { size = 78, stroke = 8, color = '#fff', track = 'rgba(255,255,255,.3)', text = '#fff' } = {}) {
-  const r = (size - stroke) / 2;
-  const c = 2 * Math.PI * r;
-  const p = Math.max(0, Math.min(100, pct));
-  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${track}" stroke-width="${stroke}"/>
-    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linecap="round"
-      stroke-dasharray="${(c * p) / 100} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>
-    <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="${text}">${Math.round(p)}%</text>
-  </svg>`;
-}
 
 /** Donut multi-segmen (terkirim / antrean / gagal). */
 export function ring(parts, { size = 170, stroke = 22 } = {}) {
