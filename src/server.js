@@ -442,10 +442,13 @@ admin.use('/chatbots', features.requireFeature('chatbot'), features.featureRoute
 admin.use('/aibot', features.requireFeature('aibot'), features.featureRouter('aibot'));
 admin.use('/cs', features.requireFeature('cs'), features.featureRouter('cs'));
 admin.use('/webwa', features.requireFeature('webwa'), features.featureRouter('webwa'));
+admin.use('/greeter', features.requireFeature('greeter'), features.featureRouter('greeter'));
 admin.use('/autoreply', features.requireFeature('autoreply'), features.featureRouter('autoreply'));
 
 app.use('/admin', admin);
-app.use(express.static(path.join(ROOT_DIR, 'public')));
+// no-cache: browser selalu cek versi terbaru (pakai ETag, file yang tidak berubah tidak diunduh ulang),
+// jadi setelah pembaruan dashboard tidak perlu Ctrl+F5
+app.use(express.static(path.join(ROOT_DIR, 'public'), { setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
 await features.loadEnabled({ wa, features, hooks });
 backup.startScheduler(wa.logger);

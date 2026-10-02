@@ -105,6 +105,27 @@ export async function startDevice(id) {
     }
   });
 
+  // Anggota grup masuk/keluar -> modul Group Greeter
+  sock.ev.on('group-participants.update', async (u) => {
+    if (!groupHandlers.length) return;
+    try {
+      const me = myIds(sock);
+      const participants = (u.participants ?? [])
+        .map((p) => (typeof p === 'string' ? { id: p } : p))
+        .map((p) => ({
+          jid: p.id,
+          phone: digitsOf(p.phoneNumber) ?? (p.id?.endsWith('@s.whatsapp.net') ? digitsOf(p.id) : null),
+          name: p.notify ?? p.name ?? '',
+        }))
+        .filter((p) => p.jid && !me.has(digitsOf(p.jid)) && !me.has(p.phone)); // abaikan nomor sendiri
+      if (!participants.length) return;
+      const ev = { deviceId: id, groupJid: u.id, action: u.action, participants, author: u.authorPn ?? u.author ?? null };
+      for (const h of groupHandlers) await h(ev);
+    } catch (err) {
+      logger.warn({ id, err: err?.message }, 'gagal memproses peristiwa grup');
+    }
+  });
+
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (e.sock !== sock) return; // socket lama, abaikan
 
@@ -199,7 +220,7 @@ class NotOnWhatsApp extends Error {
  * Kirim teks dengan efek "sedang mengetik" yang lamanya sebanding panjang pesan.
  * `target` = nomor (dicek dulu terdaftar di WA) atau JID chat (dikirim langsung).
  */
-async function sendText(sock, target, text) {
+async function sendText(sock, target, text, extra = null) {
   let jid = target;
   if (!target.includes('@')) {
     const [result] = (await sock.onWhatsApp(target)) ?? [];
@@ -209,7 +230,7 @@ async function sendText(sock, target, text) {
   await sock.sendPresenceUpdate('composing', jid).catch(() => {});
   const typingMs = Math.min(9000, 1000 + text.length * randomBetween(25, 55));
   await sleep(typingMs);
-  const sent = await sock.sendMessage(jid, { text });
+  const sent = await sock.sendMessage(jid, { text, ...(extra?.mentions?.length ? { mentions: extra.mentions } : {}) });
   await sock.sendPresenceUpdate('paused', jid).catch(() => {});
   return sent?.key?.id ?? null;
 }
@@ -316,6 +337,41 @@ export function emitHandover(msg, source) {
   }
 }
 
+// ---- Grup -----------------------------------------------------------------------------
+const groupHandlers = [];
+export const addGroupHandler = (h) => groupHandlers.push(h);
+
+/** Nomor & LID milik device ini (digit saja). */
+function myIds(sock) {
+  return new Set([digitsOf(sock.user?.id), digitsOf(sock.user?.lid), digitsOf(sock.user?.phoneNumber)].filter(Boolean));
+}
+
+/** Daftar grup tempat device ini menjadi anggota. */
+export async function listGroups(deviceId) {
+  const e = sessions.get(deviceId);
+  if (e?.status !== 'connected') throw new Error('Device tidak terhubung');
+  const me = myIds(e.sock);
+  const all = await e.sock.groupFetchAllParticipating();
+  return Object.values(all).map((g) => {
+    const mine = (g.participants ?? []).find((p) => me.has(digitsOf(p.id)) || me.has(digitsOf(p.phoneNumber)));
+    return {
+      id: g.id,
+      subject: g.subject ?? '',
+      size: g.size ?? g.participants?.length ?? 0,
+      announce: !!g.announce, // hanya admin yang boleh kirim pesan
+      meAdmin: !!mine?.admin,
+    };
+  }).sort((a, b) => a.subject.localeCompare(b.subject, 'id'));
+}
+
+/** Nama & jumlah anggota grup (untuk placeholder). */
+export async function groupInfo(deviceId, groupJid) {
+  const e = sessions.get(deviceId);
+  if (e?.status !== 'connected') return null;
+  const g = await e.sock.groupMetadata(groupJid).catch(() => null);
+  return g ? { subject: g.subject ?? '', size: g.size ?? g.participants?.length ?? 0 } : null;
+}
+
 /** Tandai pesan sudah dibaca (centang biru). */
 export async function markRead(deviceId, key) {
   const e = sessions.get(deviceId);
@@ -354,7 +410,7 @@ export async function drainQueue(id) {
       const msg = messages.nextPending(id, blocked);
       if (msg) {
         try {
-          const waId = await sendText(sock, msg.to_jid || msg.to_number, msg.body);
+          const waId = await sendText(sock, msg.to_jid || msg.to_number, msg.body, msg.extra ? JSON.parse(msg.extra) : null);
           messages.markSent(msg.id, waId);
         } catch (err) {
           if (err instanceof NotOnWhatsApp) messages.markFailed(msg.id, err.message);

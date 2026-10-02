@@ -22,6 +22,7 @@ const MENU = [
   { key: 'aibot', label: 'AI Chat Bot', icon: 'sparkles', feature: 'aibot', sub: 'Jawab pertanyaan bebas memakai AI' },
   { key: 'autoreply', label: 'Autoreply', icon: 'reply', feature: 'autoreply', sub: 'Balas otomatis berdasarkan kata kunci' },
   { key: 'form', label: 'Google Form', icon: 'form', feature: 'formScript', sub: 'Auto-reply WhatsApp saat form dikirim' },
+  { key: 'greeter', label: 'Group Greeter', icon: 'users', feature: 'greeter', sub: 'Sapa anggota baru di grup WhatsApp' },
   { key: 'birthday', label: 'Ulang Tahun', icon: 'cake', feature: 'birthday', sub: 'Ucapan otomatis dari data Kontak' },
   { group: 'Integrasi' },
   { key: 'widget', label: 'Chat Widget', icon: 'chat', feature: 'widget', sub: 'Tombol WhatsApp untuk website sekolah' },

@@ -53,6 +53,10 @@ if (!db.prepare('PRAGMA table_info(messages)').all().some((c) => c.name === 'kin
   db.exec("ALTER TABLE messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'api'");
   db.exec("UPDATE messages SET kind = 'reply' WHERE to_jid IS NOT NULL"); // data lama: ke ID chat = balasan
 }
+// Migrasi: data tambahan pesan (mis. daftar mention untuk pesan grup)
+if (!db.prepare('PRAGMA table_info(messages)').all().some((c) => c.name === 'extra')) {
+  db.exec('ALTER TABLE messages ADD COLUMN extra TEXT');
+}
 if (!db.prepare('PRAGMA table_info(devices)').all().some((c) => c.name === 'warmup_start')) {
   db.exec('ALTER TABLE devices ADD COLUMN warmup_start TEXT');
 }
@@ -97,10 +101,10 @@ export const messages = {
    * `jid` opsional: kirim langsung ke ID chat ini (tanpa cek nomor).
    * `kind`: reply | api | manual | birthday | internal (lihat antiban.js). Default: ke ID chat = reply, lainnya = api.
    */
-  enqueue(deviceId, to, body, jid = null, kind = null) {
+  enqueue(deviceId, to, body, jid = null, kind = null, extra = null) {
     const r = db
-      .prepare('INSERT INTO messages (device_id, to_number, body, to_jid, kind) VALUES (?, ?, ?, ?, ?)')
-      .run(deviceId, to, body, jid, kind ?? (jid ? 'reply' : 'api'));
+      .prepare('INSERT INTO messages (device_id, to_number, body, to_jid, kind, extra) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(deviceId, to, body, jid, kind ?? (jid ? 'reply' : 'api'), extra ? JSON.stringify(extra) : null);
     return Number(r.lastInsertRowid);
   },
   get: (id) => db.prepare('SELECT * FROM messages WHERE id = ?').get(id),

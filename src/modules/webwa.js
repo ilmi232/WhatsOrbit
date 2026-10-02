@@ -34,7 +34,8 @@ const loadSettings = () => ({ ...DEFAULTS, ...JSON.parse(getSetting('webwa', () 
 
 /** Kunci percakapan: nomor HP kalau diketahui, kalau tidak ID chat (mis. nomor tersembunyi/grup). */
 const keyOf = (phone, jid) => phone || jid;
-const KEY_IN = 'COALESCE(i.phone, i.chat_jid)';
+// Grup dikelompokkan per grup (bukan per pengirim); chat pribadi per nomor
+const KEY_IN = 'CASE WHEN i.is_group = 1 THEN i.chat_jid ELSE COALESCE(i.phone, i.chat_jid) END';
 const KEY_MSG = "CASE WHEN m.to_jid LIKE '%@lid' OR m.to_jid LIKE '%@g.us' THEN m.to_jid ELSE m.to_number END";
 
 export async function register({ router, wa, isEnabled }) {
@@ -115,6 +116,7 @@ export async function register({ router, wa, isEnabled }) {
           FROM u ${where} GROUP BY u.device_id, u.k
       )
       SELECT g.*, ${contactName} AS contact_name, d.name AS device_name,
+             ${tableExists('group_names') ? '(SELECT n.subject FROM group_names n WHERE n.device_id = g.device_id AND n.jid = g.k)' : 'NULL'} AS group_name,
              (SELECT until FROM webwa_takeover t WHERE t.device_id = g.device_id AND t.chat_key = g.k AND t.until > datetime('now')) AS takeover_until
         FROM g ${contactJoin} LEFT JOIN devices d ON d.id = g.device_id`;
     if (q) {
@@ -176,7 +178,7 @@ export async function register({ router, wa, isEnabled }) {
     if (!key) return res.status(400).json({ success: false, message: 'Chat tidak valid' });
 
     // ID chat terakhir dari lawan bicara (supaya balasan masuk ke chat yang sama, termasuk nomor tersembunyi)
-    const lastIn = db.prepare('SELECT chat_jid FROM incoming_messages WHERE device_id = ? AND COALESCE(phone, chat_jid) = ? ORDER BY id DESC LIMIT 1')
+    const lastIn = db.prepare(`SELECT chat_jid FROM incoming_messages i WHERE device_id = ? AND ${KEY_IN} = ? ORDER BY id DESC LIMIT 1`)
       .get(device.id, key);
     const jid = lastIn?.chat_jid ?? (key.includes('@') ? key : null);
     const to = /^\d+$/.test(key) ? key : key.split('@')[0];

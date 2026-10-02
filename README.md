@@ -175,6 +175,20 @@ Menu **Web WhatsApp** (modul `src/modules/webwa.js`, butuh Pesan Masuk).
 - Chat baru ke nomor yang belum pernah chat dihitung sebagai pesan yang kita
   mulai (ikut kuota anti-banned). Saat ini hanya teks; media tampil sebagai label.
 
+## Group Greeter
+
+Menu **Group Greeter** (modul `src/modules/greeter.js`).
+
+- Daftar grup tempat nomor device menjadi anggota (diambil langsung dari WhatsApp),
+  atur sapaan per grup.
+- Sambutan dengan **@mention** anggota baru; placeholder `[Nama]`, `[Grup]`,
+  `[Jumlah]`, variasi `{a|b}`. Opsional pesan pamit saat anggota keluar dan pesan
+  pribadi ke anggota baru (pesan pribadi ikut kuota anti-banned).
+- Anggota yang masuk berdekatan (default 60 detik) disapa dalam **satu pesan**
+  (maks. 20 mention per pesan), bukan satu per satu.
+- Peringatan kalau grup hanya mengizinkan admin mengirim pesan dan nomor
+  sekolah bukan admin. Masuknya nomor sekolah sendiri tidak disapa.
+
 ## Customer Service
 
 Menu **Customer Service** (modul `src/modules/cs.js`).

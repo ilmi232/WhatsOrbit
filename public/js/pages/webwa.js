@@ -21,7 +21,9 @@ function dayLabel(d) {
   return d.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 const waFormat = (s) => esc(s).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(^|\s)_([^_\n]+)_/g, '$1<i>$2</i>').replace(/~([^~\n]+)~/g, '<s>$1</s>');
-const nameOf = (c) => c.contact_name || c.push_name || localPhone(c.phone ?? c.k) || (String(c.k).endsWith('@g.us') ? 'Grup' : 'Nomor tersembunyi');
+const nameOf = (c) => String(c.k).endsWith('@g.us')
+  ? c.group_name || 'Grup'
+  : c.contact_name || c.push_name || localPhone(c.phone ?? c.k) || 'Nomor tersembunyi';
 // Inisial dari huruf saja; nama berupa nomor -> ikon orang
 const initials = (n) => String(n).trim().split(/\s+/).map((w) => w[0]).filter((x) => /\p{L}/u.test(x ?? '')).slice(0, 2).join('').toUpperCase() || '👤';
 const VIA = { reply: '', manual: 'Dashboard', api: 'API / Form', birthday: 'Ulang Tahun', blast: 'Blast', hp: 'Dari HP' };
@@ -58,7 +60,8 @@ function renderThread(el, keepScroll) {
     const day = d.toDateString();
     const sep = day !== lastDay ? `<div class="wa-day">${dayLabel(d)}</div>` : '';
     lastDay = day;
-    const via = m.dir === 'out' ? VIA[m.via] ?? '' : (m.via ?? '');
+    // Grup: tampilkan nama pengirim di setiap pesan masuk
+    const via = m.dir === 'out' ? VIA[m.via] ?? '' : m.is_group ? (m.name || localPhone(m.phone) || '') : (m.via ?? '');
     return `${sep}<div class="wa-msg ${m.dir === 'out' ? 'out' : ''}">${via ? `<div class="via">${esc(via)}</div>` : ''}${waFormat(m.body)}
       <div class="meta">${hhmm(d)}${m.dir === 'out' ? ` <span title="${esc(m.status ?? '')}">${TICK[m.status] ?? ''}</span>` : ''}</div></div>`;
   }).join('') : '<div class="wa-empty">Belum ada pesan. Tulis pesan pertama di bawah.</div>';

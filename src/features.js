@@ -82,6 +82,13 @@ export const FEATURES = [
     load: () => import('./modules/autoreply.js'),
   },
   {
+    key: 'greeter',
+    name: 'Group Greeter',
+    description: 'Sapa anggota baru di grup WhatsApp (dengan @mention), opsional pesan pamit & pesan pribadi ke anggota baru.',
+    default: true,
+    load: () => import('./modules/greeter.js'),
+  },
+  {
     key: 'widget',
     name: 'Chat Widget',
     description: 'Tombol WhatsApp melayang untuk website sekolah: banyak agen, jam online, sapaan, dan statistik klik.',
