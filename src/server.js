@@ -1,3 +1,4 @@
+import './restore-boot.js'; // harus paling awal: pulihkan backup sebelum database dibuka
 import express from 'express';
 import path from 'node:path';
 import { createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -6,6 +7,7 @@ import { db, devices, getSetting, messages, tableExists } from './db.js';
 import { normalizePhone } from './phone.js';
 import * as wa from './wa.js';
 import * as features from './features.js';
+import * as backup from './backup.js';
 
 if (!ADMIN_PASSWORD) {
   console.error('ADMIN_PASSWORD belum diisi. Salin .env.example menjadi .env lalu isi password admin.');
@@ -257,6 +259,43 @@ admin.get('/system', (_req, res) =>
   })
 );
 
+// ---- Backup -------------------------------------------------------------------------
+admin.get('/backup', (_req, res) => {
+  const s = backup.loadSettings();
+  let items = [];
+  let listError = null;
+  try { items = backup.list(s.dir); } catch (err) { listError = err.message; }
+  res.json({ success: true, data: { settings: s, suggestions: backup.suggestions(), items, last: backup.lastResult(), listError, pm2: process.env.pm_id !== undefined } });
+});
+
+admin.put('/backup/settings', (req, res) => {
+  try { res.json({ success: true, data: backup.saveSettings(req.body ?? {}) }); } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+admin.post('/backup/run', (_req, res) => {
+  try { res.json({ success: true, data: backup.run('manual') }); } catch (err) {
+    res.status(400).json({ success: false, message: `Backup gagal: ${err.message}` });
+  }
+});
+
+admin.post('/backup/restore', (req, res) => {
+  if (process.env.pm_id === undefined) {
+    return res.status(400).json({ success: false, message: 'Pulihkan butuh server berjalan lewat PM2 (supaya bisa restart otomatis).' });
+  }
+  try {
+    // Backup kondisi sekarang dulu (kalau folder tujuan ada), lalu pulihkan saat restart
+    // (tanpa menghapus backup lama, supaya backup yang mau dipulihkan tidak ikut terhapus)
+    try { backup.run('sebelum pulihkan', { prune: false }); } catch { /* tetap lanjut: data lama juga disimpan di folder data */ }
+    const b = backup.scheduleRestore(String(req.body?.name ?? ''));
+    res.json({ success: true, data: b });
+    setTimeout(() => process.exit(0), 300);
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
 admin.post('/restart', (_req, res) => {
   if (process.env.pm_id === undefined) {
     return res.status(400).json({ success: false, message: 'Server tidak berjalan lewat PM2, restart manual.' });
@@ -382,6 +421,7 @@ app.use('/admin', admin);
 app.use(express.static(path.join(ROOT_DIR, 'public')));
 
 await features.loadEnabled({ wa, features, hooks });
+backup.startScheduler(wa.logger);
 
 app.listen(PORT, HOST, async () => {
   console.log(`WhatsOrbit ${VERSION} berjalan di http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);

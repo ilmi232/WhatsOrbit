@@ -2,3 +2,8 @@ node_modules/
 data/
 .env
 *.log
+# Backup (kalau folder tujuan ada di dalam folder proyek)
+WhatsOrbit-Backup/
+backups/
+# File uji sementara
+.*-test*.mjs
