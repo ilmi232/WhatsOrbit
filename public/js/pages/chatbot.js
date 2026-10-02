@@ -131,7 +131,7 @@ function render(el, ctx) {
       <div class="card empty">${icon('bot')}
         <div style="font-weight:600;color:var(--text);margin-bottom:4px">Belum ada Chat Bot</div>
         <div style="margin-bottom:16px">Bot menu bernomor: pengirim membalas angka untuk melihat info PPDB, jadwal, lokasi, atau minta bicara dengan admin.<br>Bot baru berisi contoh menu sekolah yang bisa langsung diubah.</div>
-        <button class="btn grad" id="newBot">${icon('plus')} Buat bot</button>
+        <button class="btn grad" id="newBot">Buat bot</button>
       </div>`;
     return;
   }

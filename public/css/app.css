@@ -419,7 +419,7 @@ td.cb, th.cb { width: 34px; }
 
 /* Empty */
 .empty { text-align: center; padding: 40px 20px; color: var(--muted); }
-.empty .svg-icon { width: 40px; height: 40px; margin-bottom: 8px; color: var(--primary); }
+.empty > .svg-icon { width: 40px; height: 40px; margin-bottom: 8px; color: var(--primary); }
 
 /* Login */
 .login-wrap { min-height: 100vh; display: grid; place-items: center; padding: 20px; }

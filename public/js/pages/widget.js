@@ -172,7 +172,7 @@ function render(el, ctx) {
       <div class="card empty">${icon('chat')}
         <div style="font-weight:600;color:var(--text);margin-bottom:4px">Belum ada Chat Widget</div>
         <div style="margin-bottom:16px">Tombol WhatsApp melayang untuk website sekolah. Pengunjung memilih admin, lalu chat terbuka di WhatsApp mereka.</div>
-        <button class="btn grad" id="newWidget">${icon('plus')} Buat widget</button>
+        <button class="btn grad" id="newWidget">Buat widget</button>
       </div>`;
     return;
   }
