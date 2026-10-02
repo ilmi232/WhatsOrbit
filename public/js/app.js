@@ -6,6 +6,7 @@ import { $, call, esc, icon, setUnauthorizedHandler, toast } from './ui.js';
 const MENU = [
   { group: 'Utama' },
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', sub: 'Ringkasan aktivitas WhatsOrbit' },
+  { key: 'tutorial', label: 'Tutorial', icon: 'form', sub: 'Panduan memakai setiap fitur WhatsOrbit' },
   { group: 'Data' },
   { key: 'contacts', label: 'Kontak', icon: 'users', feature: 'contacts', sub: 'Data & grup kontak untuk Blast' },
   { key: 'leads', label: 'Daily Leads', icon: 'userplus', feature: 'leads', sub: 'Pengisi Google Form per hari' },
@@ -125,7 +126,9 @@ async function updateBell() {
 
 // ---- Routing ----------------------------------------------------------------
 async function route() {
-  const key = location.hash.replace(/^#\/?/, '') || 'dashboard';
+  // "#/tutorial/blast" -> halaman "tutorial"; bagian setelahnya diurus halamannya sendiri
+  const key = location.hash.replace(/^#\/?/, '').split('/')[0] || 'dashboard';
+  if (current?.key === key && location.hash.includes(`#/${key}/`)) return;
   const item = MENU.find((m) => m.key === key);
   if (!item || !ctx.isOn(item.feature)) {
     if (key !== 'dashboard') return ctx.navigate('dashboard');

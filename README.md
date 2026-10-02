@@ -17,6 +17,8 @@ sehingga RAM-nya kecil (± 100–150 MB + 20–60 MB per nomor).
 - Cek nomor terdaftar di WhatsApp sebelum kirim
 - Log pesan (terkirim / antrean / gagal) + tombol kirim ulang
 - Generator Apps Script untuk Google Form
+- Menu **Tutorial** di dashboard: panduan langkah demi langkah per fitur, FAQ, dan
+  pemecahan masalah (bisa dicari; tautan langsung `#/tutorial/<artikel>`)
 
 ## Backup
 
