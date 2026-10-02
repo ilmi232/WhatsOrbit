@@ -102,6 +102,12 @@ export const FEATURES = [
     default: true,
   },
   {
+    key: 'sheets',
+    name: 'Generator Script Google Spreadsheet',
+    description: 'Kirim WhatsApp otomatis saat ada baris baru di Google Spreadsheet (dengan kolom status & kondisi).',
+    default: true,
+  },
+  {
     key: 'blast',
     name: 'Blast',
     description: 'Kirim pesan massal dengan anti-banned: jeda acak, istirahat, batas harian, rotasi device.',

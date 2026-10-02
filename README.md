@@ -175,6 +175,23 @@ Menu **Web WhatsApp** (modul `src/modules/webwa.js`, butuh Pesan Masuk).
 - Chat baru ke nomor yang belum pernah chat dihitung sebagai pesan yang kita
   mulai (ikut kuota anti-banned). Saat ini hanya teks; media tampil sebagai label.
 
+## Google Spreadsheet
+
+Menu **Google Spreadsheet** (generator saja, tanpa modul server).
+
+- Tempel baris judul dari spreadsheet, pilih kolom nomor, tulis pesan dengan
+  `[Judul Kolom]` dan `{a|b}`, lalu tempel kode di **Ekstensi → Apps Script** dan
+  jalankan `pasangPemicu` sekali.
+- Script memeriksa baris baru setiap 1–30 menit, mengirim lewat `/api/send`, dan
+  menulis hasil di kolom **Status WA** (dibuat otomatis). Kosongkan sel status
+  untuk mengirim ulang.
+- Baris yang sudah ada saat dipasang ditandai *Dilewati (data lama)*.
+- Baris ditunggu sampai kolom yang dipakai di pesan terisi; kondisi opsional
+  (mis. *Status Pembayaran = Lunas*); maks. N baris per pemeriksaan.
+- Server tidak bisa dihubungi → baris tidak ditandai, dicoba lagi berikutnya.
+- Menu **WhatsOrbit** di spreadsheet: proses sekarang & kirim ulang baris terpilih.
+- Opsional simpan sebagai kontak (Daily Leads).
+
 ## Group Greeter
 
 Menu **Group Greeter** (modul `src/modules/greeter.js`).
