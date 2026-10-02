@@ -12,13 +12,28 @@ let ctxRef = null;
 const waFormat = (s) => esc(s).replace(/\*([^*\n]+)\*/g, '<b>$1</b>').replace(/(^|\s)_([^_\n]+)_/g, '$1<i>$2</i>');
 const modelOf = () => draft.models[draft.provider] || P[draft.provider].defaultModel || '';
 
+// Judul singkat + keterangan kecil di kartu pilihan penyedia
+const PROV_LABEL = {
+  gemini: ['Google Gemini', 'AI Studio · disarankan'],
+  groq: ['Groq', 'Llama dll., sangat cepat'],
+  openrouter: ['OpenRouter', 'Banyak model, ada yang gratis'],
+  openai: ['OpenAI', 'ChatGPT'],
+  anthropic: ['Claude', 'Anthropic'],
+  custom: ['Server lain', 'Kompatibel OpenAI (Ollama dll.)'],
+};
+
 function providerCards() {
-  return Object.entries(P).map(([k, p]) => `
-    <label class="check" style="align-items:flex-start;padding:12px 14px;flex:1 1 220px">
-      <input type="radio" name="prov" value="${k}" ${draft.provider === k ? 'checked' : ''} style="margin-top:3px">
-      <span><b>${esc(p.name)}</b> ${p.free ? chip('ok', 'Ada gratis') : chip('muted', 'Berbayar')}
-        ${S.keys[k] ? `<span class="muted" style="display:block;font-weight:400">${icon('key')} key tersimpan</span>` : ''}</span>
-    </label>`).join('');
+  return Object.entries(P).map(([k, p]) => {
+    const [title, sub] = PROV_LABEL[k] ?? [p.name, ''];
+    return `
+    <label class="prov-card ${draft.provider === k ? 'on' : ''}">
+      <input type="radio" name="prov" value="${k}" ${draft.provider === k ? 'checked' : ''}>
+      <span class="prov-top"><b>${esc(title)}</b><span class="prov-tick">${icon('check')}</span></span>
+      <span class="prov-sub">${esc(sub ?? '')}</span>
+      <span class="prov-foot">${p.free ? chip('ok', 'Ada gratis') : chip('muted', 'Berbayar')}
+        ${S.keys[k] ? `<span class="prov-key">${icon('key')} tersimpan</span>` : ''}</span>
+    </label>`;
+  }).join('');
 }
 
 // Daftar model hasil "Muat daftar model", per penyedia: { models, recommended }
@@ -181,7 +196,7 @@ function render(el, ctx) {
       <div class="stack">
         <div class="card">
           <div class="card-head"><div><h3>Penyedia AI</h3><p>API key disimpan di database WhatsOrbit di PC ini</p></div></div>
-          <div class="row" id="provCards" style="margin-bottom:16px">${providerCards()}</div>
+          <div class="prov-grid" id="provCards">${providerCards()}</div>
           <div id="provDetail">${providerDetail()}</div>
         </div>
         <div class="card">
@@ -360,6 +375,7 @@ function bind(el, ctx) {
     const t = e.target;
     if (t.name === 'prov') {
       draft.provider = t.value;
+      $$('.prov-card', el).forEach((c) => c.classList.toggle('on', c.contains(t)));
       $('#provDetail', el).innerHTML = providerDetail();
       return markDirty(el);
     }
