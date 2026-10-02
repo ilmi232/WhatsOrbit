@@ -6,7 +6,7 @@ import { $, call, esc, icon, setUnauthorizedHandler, toast } from './ui.js';
 const MENU = [
   { group: 'Utama' },
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', sub: 'Ringkasan aktivitas WhatsOrbit' },
-  { key: 'tutorial', label: 'Tutorial', icon: 'form', sub: 'Panduan memakai setiap fitur WhatsOrbit' },
+  { key: 'tutorial', label: 'Tutorial', icon: 'book', sub: 'Panduan memakai setiap fitur WhatsOrbit' },
   { group: 'Data' },
   { key: 'contacts', label: 'Kontak', icon: 'users', feature: 'contacts', sub: 'Data & grup kontak untuk Blast' },
   { key: 'leads', label: 'Daily Leads', icon: 'userplus', feature: 'leads', sub: 'Pengisi Google Form per hari' },
