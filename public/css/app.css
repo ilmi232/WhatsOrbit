@@ -310,8 +310,12 @@ td.cb, th.cb { width: 34px; }
 @media (prefers-color-scheme: dark) { .sim-log { background: #0b141a; } .sim-msg { background: #202c33; color: #e9edef; } .sim-msg.me { background: #005c4b; } }
 
 /* Web WhatsApp */
-.wa-shell { display: grid; grid-template-columns: 340px minmax(0, 1fr); height: calc(100vh - 140px); min-height: 480px; padding: 0; overflow: hidden; }
-.wa-side { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; }
+/* Tinggi tetap; daftar chat & isi percakapan scroll masing-masing (min-height:0 wajib,
+   kalau tidak item grid/flex memanjang mengikuti isi dan mendorong halaman) */
+.wa-shell { display: grid; grid-template-columns: 340px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); height: calc(100vh - 172px); min-height: 400px; padding: 0; overflow: hidden; }
+.wa-side { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.wa-list { min-height: 0; }
+#waChat { min-height: 0; overflow: hidden; }
 .wa-side-head { padding: 14px; display: grid; gap: 10px; border-bottom: 1px solid var(--line); }
 .wa-list { overflow-y: auto; flex: 1; }
 .wa-item { display: flex; gap: 12px; padding: 12px 14px; cursor: pointer; border-bottom: 1px solid var(--line); align-items: center; }
@@ -323,7 +327,9 @@ td.cb, th.cb { width: 34px; }
 .wa-item small { display: block; color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wa-item .end { text-align: right; flex: none; font-size: 11px; color: var(--muted); display: grid; gap: 4px; justify-items: end; }
 .wa-badge { background: var(--ok); color: #fff; border-radius: 99px; font-size: 11px; font-weight: 700; padding: 0 7px; min-width: 20px; text-align: center; }
-.wa-main { display: flex; flex-direction: column; min-width: 0; }
+.wa-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+.wa-head, .wa-banner, .wa-input { flex: none; }
+.wa-msgs { min-height: 0; }
 .wa-head { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
 .wa-head .who { flex: 1; min-width: 0; }
 .wa-head .who b { display: block; font-weight: 600; }
@@ -347,7 +353,7 @@ td.cb, th.cb { width: 34px; }
   .wa-day { background: #182229; color: #8696a0; }
 }
 @media (max-width: 900px) {
-  .wa-shell { grid-template-columns: 1fr; height: calc(100vh - 120px); }
+  .wa-shell { grid-template-columns: 1fr; height: calc(100vh - 148px); }
   .wa-shell.open .wa-side { display: none; }
   .wa-shell:not(.open) .wa-main { display: none; }
 }
