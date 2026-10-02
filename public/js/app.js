@@ -111,18 +111,24 @@ $('#logoutBtn').addEventListener('click', async () => {
   showLogin();
 });
 $('#gearBtn').addEventListener('click', () => ctx.navigate('settings'));
-$('#bellBtn').addEventListener('click', () => ctx.navigate(ctx.isOn('messageLog') ? 'messages' : 'dashboard'));
 
-async function updateBell() {
-  try {
-    const { data } = await call('GET', '/admin/stats');
-    const n = data.today.failed;
-    const dot = $('#bellDot');
-    dot.textContent = n;
-    dot.classList.toggle('hidden', !n);
-    $('#bellBtn').title = n ? `${n} pesan gagal hari ini` : 'Tidak ada pesan gagal hari ini';
-  } catch { /* abaikan */ }
+// ---- Mode gelap / terang ----------------------------------------------------
+// Tema awal sudah dipasang skrip di index.html; tombol ini menyimpan pilihan di browser.
+const savedTheme = () => { try { return localStorage.getItem('wo-theme'); } catch { return null; } };
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  $('#themeBtn').title = t === 'dark' ? 'Ganti ke mode terang' : 'Ganti ke mode gelap';
 }
+applyTheme(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+$('#themeBtn').addEventListener('click', () => {
+  const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  try { localStorage.setItem('wo-theme', t); } catch { /* mode privat: berlaku sampai halaman ditutup */ }
+  applyTheme(t);
+});
+// Belum pernah memilih -> ikut perubahan tema sistem
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+  if (!savedTheme()) applyTheme(e.matches ? 'dark' : 'light');
+});
 
 // ---- Routing ----------------------------------------------------------------
 async function route() {
@@ -172,7 +178,6 @@ async function start() {
   $('#login').classList.add('hidden');
   $('#app').classList.remove('hidden');
   await route();
-  updateBell();
 
   clearInterval(pollTimer);
   let tick = 0;
@@ -184,7 +189,6 @@ async function start() {
     } catch { /* abaikan, dicoba lagi */ }
     if (tick % 5 === 0) {
       ctx.reloadInfo().catch(() => {});
-      updateBell();
     }
   }, 3000);
 }

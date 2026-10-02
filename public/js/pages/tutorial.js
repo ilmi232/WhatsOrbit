@@ -119,7 +119,7 @@ const ARTICLES = [
         '<b>Terkirim</b>: sudah sampai server WhatsApp.',
         '<b>Gagal</b>: mis. nomor tidak terdaftar di WhatsApp. Klik <b>Kirim ulang</b> setelah diperbaiki.',
       )}
-      Ikon lonceng di atas menunjukkan jumlah pesan gagal hari ini.`,
+      Jumlah pesan gagal hari ini juga tampil di Dashboard.`,
   },
   {
     id: 'blast', group: 'Outgoing', icon: 'blast', title: 'Blast (kirim massal)', feature: 'blast', menu: 'blast',
