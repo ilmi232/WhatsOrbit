@@ -14,6 +14,7 @@ const MENU = [
   { key: 'messages', label: 'Log Pesan', icon: 'list', feature: 'messageLog', sub: 'Riwayat pesan API & Google Form' },
   { key: 'blast', label: 'Blast', icon: 'blast', feature: 'blast', sub: 'Kirim massal dengan anti-banned' },
   { group: 'Incoming' },
+  { key: 'webwa', label: 'Web WhatsApp', icon: 'chat', feature: 'webwa', sub: 'Baca & balas chat seperti WhatsApp Web' },
   { key: 'inbox', label: 'Pesan Masuk', icon: 'inbox', feature: 'inbox', sub: 'Pesan WhatsApp yang diterima device' },
   { key: 'cs', label: 'Customer Service', icon: 'headset', feature: 'cs', sub: 'Chat pelanggan dibagi ke petugas CS' },
   { group: 'Otomasi' },

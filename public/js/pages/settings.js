@@ -3,7 +3,7 @@ import { mountBackup } from './_backup.js';
 import { mountAntiban } from './_antiban.js';
 
 const FEATURE_ICON = {
-  api: 'code', contacts: 'users', leads: 'userplus', birthday: 'cake', widget: 'chat', chatbot: 'bot', aibot: 'sparkles', cs: 'headset', inbox: 'inbox', autoreply: 'reply', formScript: 'form', blast: 'blast', messageLog: 'list',
+  api: 'code', contacts: 'users', leads: 'userplus', birthday: 'cake', widget: 'chat', chatbot: 'bot', aibot: 'sparkles', cs: 'headset', webwa: 'chat', inbox: 'inbox', autoreply: 'reply', formScript: 'form', blast: 'blast', messageLog: 'list',
 };
 
 // Fitur Starsender yang belum ada di WhatsOrbit (rencana pengembangan)
@@ -13,7 +13,6 @@ const ROADMAP = [
     ['link', 'Integrasi Lynk.id / Mayar.id', 'Notifikasi pembayaran'],
   ]],
   ['Premium', [
-    ['chat', 'Web WhatsApp', 'Balas chat dari dashboard'],
     ['link', 'Link Rotator', 'Satu link untuk beberapa nomor'],
     ['users', 'Group Greeter', 'Sapa anggota baru grup'],
   ]],

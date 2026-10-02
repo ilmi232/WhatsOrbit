@@ -441,6 +441,7 @@ admin.use('/widgets', features.requireFeature('widget'), features.featureRouter(
 admin.use('/chatbots', features.requireFeature('chatbot'), features.featureRouter('chatbot'));
 admin.use('/aibot', features.requireFeature('aibot'), features.featureRouter('aibot'));
 admin.use('/cs', features.requireFeature('cs'), features.featureRouter('cs'));
+admin.use('/webwa', features.requireFeature('webwa'), features.featureRouter('webwa'));
 admin.use('/autoreply', features.requireFeature('autoreply'), features.featureRouter('autoreply'));
 
 app.use('/admin', admin);

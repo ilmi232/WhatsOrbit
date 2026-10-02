@@ -88,8 +88,13 @@ export async function startDevice(id) {
 
   // Pesan masuk -> diteruskan ke modul (Pesan Masuk, Autoreply) kalau ada yang mendengarkan
   sock.ev.on('messages.upsert', async ({ type, messages: list }) => {
-    if (type !== 'notify' || !incomingHandlers.length) return;
     for (const m of list) {
+      // Pesan dari nomor ini sendiri (mis. dibalas langsung dari HP) -> modul Web WhatsApp
+      if (m.key?.fromMe) {
+        if (ownHandlers.length) queueOwnMessage(id, sock, m);
+        continue;
+      }
+      if (type !== 'notify' || !incomingHandlers.length) continue;
       try {
         const msg = await normalizeIncoming(id, sock, m);
         if (!msg) continue;
@@ -228,10 +233,32 @@ const MEDIA_LABEL = {
 const IGNORE_TYPES = new Set(['protocolMessage', 'reactionMessage', 'pollUpdateMessage', 'keepInChatMessage', 'editedMessage']);
 const digitsOf = (jid) => jid?.split('@')[0]?.split(':')[0] ?? null;
 
+/**
+ * Pesan yang dikirim dari nomor ini tapi BUKAN lewat WhatsOrbit (mis. dari aplikasi WA di HP).
+ * Diproses beberapa detik kemudian, supaya pesan kiriman WhatsOrbit sendiri (yang ID-nya
+ * baru tercatat setelah terkirim) bisa dikenali dan dilewati.
+ */
+const ownHandlers = [];
+export const addOwnMessageHandler = (h) => ownHandlers.push(h);
+
+function queueOwnMessage(deviceId, sock, m) {
+  const ts = Number(m.messageTimestamp ?? 0) * 1000;
+  if (ts && Date.now() - ts > 10 * 60 * 1000) return; // riwayat lama
+  setTimeout(async () => {
+    try {
+      if (messages.byWaId(m.key.id)) return; // dikirim oleh WhatsOrbit
+      const msg = await normalizeIncoming(deviceId, sock, m, { own: true });
+      if (msg) for (const h of ownHandlers) await h(msg);
+    } catch (err) {
+      logger.warn({ err: err?.message }, 'gagal memproses pesan keluar dari HP');
+    }
+  }, 4000);
+}
+
 /** Ubah pesan Baileys jadi bentuk sederhana. Mengembalikan null untuk yang tidak perlu diproses. */
-async function normalizeIncoming(deviceId, sock, m) {
+async function normalizeIncoming(deviceId, sock, m, { own = false } = {}) {
   const k = m.key;
-  if (!k || k.fromMe || !m.message) return null;
+  if (!k || (k.fromMe && !own) || !m.message) return null;
   const chat = k.remoteJid;
   if (!chat || chat === 'status@broadcast' || chat.endsWith('@broadcast') || chat.endsWith('@newsletter')) return null;
 

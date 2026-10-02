@@ -46,6 +46,14 @@ export const FEATURES = [
     load: () => import('./modules/inbox.js'),
   },
   {
+    key: 'webwa',
+    name: 'Web WhatsApp',
+    description: 'Baca & balas chat dalam tampilan percakapan seperti WhatsApp Web; bot diam otomatis saat admin membalas.',
+    default: true,
+    requires: ['inbox'],
+    load: () => import('./modules/webwa.js'),
+  },
+  {
     key: 'cs',
     name: 'Customer Service',
     description: 'Bagi chat ke petugas CS secara bergiliran. Petugas membalas dari WhatsApp pribadinya, diteruskan dari nomor sekolah.',

@@ -159,6 +159,22 @@ Menu **AI Chat Bot** (modul `src/modules/aibot.js`, penyedia di `src/ai-provider
 - Paket gratis Gemini: Google dapat memakai isi percakapan untuk meningkatkan
   layanannya, jadi jangan masukkan data pribadi siswa.
 
+## Web WhatsApp
+
+Menu **Web WhatsApp** (modul `src/modules/webwa.js`, butuh Pesan Masuk).
+
+- Daftar chat (nama dari Kontak, pesan terakhir, belum dibaca, cari, tab Pribadi/Grup)
+  dan percakapan seperti WhatsApp Web.
+- Satu percakapan menggabungkan: pesan masuk, balasan bot/AI/Autoreply/CS,
+  Kirim Pesan, API/Form, Blast, Ulang Tahun, dan **pesan yang dikirim langsung
+  dari HP** (dicatat sejak fitur aktif).
+- **Ambil alih**: saat admin membalas dari sini, Chat Bot/Autoreply/AI diam untuk
+  chat itu selama 60 menit (bisa dilepas/diaktifkan manual).
+- Chat yang sedang ditangani Customer Service: balasan lewat tiket (tercatat dan
+  diteruskan ke petugas).
+- Chat baru ke nomor yang belum pernah chat dihitung sebagai pesan yang kita
+  mulai (ikut kuota anti-banned). Saat ini hanya teks; media tampil sebagai label.
+
 ## Customer Service
 
 Menu **Customer Service** (modul `src/modules/cs.js`).
