@@ -111,7 +111,7 @@ const ARTICLES = [
       ${note('Pesan ke banyak orang lebih baik lewat <b>Blast</b> (ada jeda, istirahat, jam kirim, dan laporan).')}`,
   },
   {
-    id: 'log', group: 'Outgoing', icon: 'list', title: 'Log Pesan', feature: 'messageLog', menu: 'messages',
+    id: 'log', group: 'Outgoing', icon: 'history', title: 'Log Pesan', feature: 'messageLog', menu: 'messages',
     summary: 'Cek pesan terkirim, antre, atau gagal.',
     body: `
       ${tips(
@@ -231,7 +231,7 @@ const ARTICLES = [
       ${note('Kalau pemicu dibuat manual lewat menu Pemicu (ikon jam), pilih fungsi <b>onFormSubmitWA</b> dan jenis peristiwa <b>Saat formulir dikirim</b>, bukan pasangPemicu.')}`,
   },
   {
-    id: 'sheets', group: 'Otomasi', icon: 'list', title: 'Google Spreadsheet → WhatsApp', feature: 'sheets', menu: 'sheets',
+    id: 'sheets', group: 'Otomasi', icon: 'sheet', title: 'Google Spreadsheet → WhatsApp', feature: 'sheets', menu: 'sheets',
     summary: 'Kirim WA dari baris baru di spreadsheet.',
     body: `
       ${steps(
