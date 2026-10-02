@@ -101,7 +101,6 @@ function renderChrome() {
   $('#ramPill').innerHTML = `
     <span class="pill-a">${icon('cpu')} ${info.memory.rssMb} MB</span>
     <span class="pill-b">${info.connected} device online</span>`;
-  $('#version').textContent = `v${info.version}`;
 }
 
 $('#burger').addEventListener('click', () => $('.shell').classList.toggle('nav-open'));
