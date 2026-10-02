@@ -8,6 +8,7 @@ import { normalizePhone } from './phone.js';
 import * as wa from './wa.js';
 import * as features from './features.js';
 import * as backup from './backup.js';
+import * as antiban from './antiban.js';
 
 if (!ADMIN_PASSWORD) {
   console.error('ADMIN_PASSWORD belum diisi. Salin .env.example menjadi .env lalu isi password admin.');
@@ -259,6 +260,31 @@ admin.get('/system', (_req, res) =>
   })
 );
 
+// ---- Anti-banned ---------------------------------------------------------------------
+admin.get('/antiban', (_req, res) => {
+  res.json({
+    success: true,
+    data: {
+      settings: antiban.loadSettings(),
+      warmup: antiban.WARMUP,
+      devices: devices.all().map((d) => ({ id: d.id, name: d.name, status: wa.getState(d.id).status, ...antiban.usage(d.id) })),
+    },
+  });
+});
+
+admin.put('/antiban', (req, res) => {
+  const s = antiban.saveSettings(req.body ?? {});
+  for (const d of devices.all()) wa.drainQueue(d.id); // kuota naik -> pesan tertahan bisa jalan lagi
+  res.json({ success: true, data: s });
+});
+
+admin.patch('/devices/:id/warmup', (req, res) => {
+  const d = findDevice(req, res);
+  if (!d) return;
+  antiban.setWarmup(d.id, !!req.body?.on);
+  res.json({ success: true, data: antiban.usage(d.id) });
+});
+
 // ---- Backup -------------------------------------------------------------------------
 admin.get('/backup', (_req, res) => {
   const s = backup.loadSettings();
@@ -309,7 +335,7 @@ admin.post('/restart', (_req, res) => {
 function deviceView(d) {
   const counts = { pending: 0, sent: 0, failed: 0 };
   for (const s of messages.stats()) if (s.device_id === d.id) counts[s.status] = s.n;
-  return { ...d, ...wa.getState(d.id), counts };
+  return { ...d, ...wa.getState(d.id), counts, antiban: antiban.usage(d.id) };
 }
 
 const findDevice = (req, res) => {
@@ -386,7 +412,7 @@ admin.post('/devices/:id/test', (req, res) => {
   }
   if (!seen.size || !body) return res.status(400).json({ success: false, message: 'Nomor dan pesan wajib diisi' });
   if (seen.size > 500) return res.status(400).json({ success: false, message: 'Maksimal 500 nomor sekali kirim. Untuk lebih banyak, gunakan Blast.' });
-  const ids = [...seen].map((n) => messages.enqueue(d.id, n, body));
+  const ids = [...seen].map((n) => messages.enqueue(d.id, n, body, null, 'manual'));
   wa.drainQueue(d.id);
   res.json({ success: true, data: { queued: ids.length, invalid, id: ids[0] } });
 });

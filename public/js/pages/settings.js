@@ -1,5 +1,6 @@
 import { $, confirmBox, esc, icon } from '../ui.js';
 import { mountBackup } from './_backup.js';
+import { mountAntiban } from './_antiban.js';
 
 const FEATURE_ICON = {
   api: 'code', contacts: 'users', leads: 'userplus', birthday: 'cake', widget: 'chat', chatbot: 'bot', aibot: 'sparkles', cs: 'headset', inbox: 'inbox', autoreply: 'reply', formScript: 'form', blast: 'blast', messageLog: 'list',
@@ -106,6 +107,7 @@ async function render(el, ctx) {
           <div><b>${esc(name)}</b><small>${esc(desc)}</small></div>
         </div>`).join('')}</div>`).join('')}
   </div>`;
+  mountAntiban($('#antibanCard', el), ctx).catch((err) => { $('#antibanCard', el).innerHTML = `<div class="muted c-bad">${esc(err.message)}</div>`; });
   mountBackup($('#backupCard', el), ctx).catch((err) => { $('#backupCard', el).innerHTML = `<div class="muted c-bad">${esc(err.message)}</div>`; });
 }
 

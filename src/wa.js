@@ -11,6 +11,7 @@ import { existsSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { MAX_ATTEMPTS, SEND_DELAY_MAX_MS, SEND_DELAY_MIN_MS, SESSIONS_DIR } from './config.js';
 import { devices, messages } from './db.js';
+import * as antiban from './antiban.js';
 
 const logger = pino({ level: process.env.LOG_LEVEL || 'warn' });
 const waLogger = logger.child({ module: 'baileys' }, { level: process.env.BAILEYS_LOG_LEVEL || 'silent' });
@@ -320,7 +321,10 @@ export async function drainQueue(id) {
     while (e.status === 'connected' && e.sock) {
       const sock = e.sock;
 
-      const msg = messages.nextPending(id);
+      // Anti-banned: jenis pesan yang kuota hariannya habis ditahan (tetap antre untuk besok)
+      const blocked = antiban.blockedKinds(id);
+      messages.markHeld(id, blocked);
+      const msg = messages.nextPending(id, blocked);
       if (msg) {
         try {
           const waId = await sendText(sock, msg.to_jid || msg.to_number, msg.body);
@@ -330,7 +334,13 @@ export async function drainQueue(id) {
           else messages.markAttemptFailed(msg.id, String(err?.message ?? err), MAX_ATTEMPTS);
           logger.warn({ id, msgId: msg.id, err: err?.message }, 'gagal kirim');
         }
-        await sleep(randomBetween(SEND_DELAY_MIN_MS, SEND_DELAY_MAX_MS));
+        // Pesan yang kita mulai (Kirim Pesan, Ulang Tahun) memakai jeda lebih panjang
+        if (antiban.INITIATED.includes(msg.kind)) {
+          const s = antiban.loadSettings();
+          await sleep(randomBetween(s.initDelayMin * 1000, s.initDelayMax * 1000));
+        } else {
+          await sleep(randomBetween(SEND_DELAY_MIN_MS, SEND_DELAY_MAX_MS));
+        }
         continue;
       }
 
@@ -366,3 +376,4 @@ export async function restoreAll() {
 export const connectedCount = () => [...sessions.values()].filter((e) => e.status === 'connected').length;
 
 export { logger, randomBetween };
+export const canInitiate = antiban.canInitiate;

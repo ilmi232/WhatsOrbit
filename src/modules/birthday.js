@@ -190,7 +190,7 @@ export async function register({ router, wa, isEnabled }) {
       const deviceId = pickDevice(s);
       if (!deviceId) break;
       const body = render(s.template, varsFor(c, now)).trim();
-      const mid = messages.enqueue(deviceId, c.phone, body);
+      const mid = messages.enqueue(deviceId, c.phone, body, null, 'birthday');
       db.prepare('INSERT OR IGNORE INTO birthday_log (contact_id, year, message_id, device_id, body) VALUES (?, ?, ?, ?, ?)')
         .run(c.id, year, mid, deviceId, body);
       touched.add(deviceId);

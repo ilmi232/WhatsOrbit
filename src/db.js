@@ -48,6 +48,14 @@ if (!db.prepare('PRAGMA table_info(messages)').all().some((c) => c.name === 'wa_
   db.exec('ALTER TABLE messages ADD COLUMN wa_id TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_messages_wa_id ON messages(wa_id)');
 }
+// Migrasi anti-banned: jenis pesan (lihat antiban.js) & mode pemanasan per device
+if (!db.prepare('PRAGMA table_info(messages)').all().some((c) => c.name === 'kind')) {
+  db.exec("ALTER TABLE messages ADD COLUMN kind TEXT NOT NULL DEFAULT 'api'");
+  db.exec("UPDATE messages SET kind = 'reply' WHERE to_jid IS NOT NULL"); // data lama: ke ID chat = balasan
+}
+if (!db.prepare('PRAGMA table_info(devices)').all().some((c) => c.name === 'warmup_start')) {
+  db.exec('ALTER TABLE devices ADD COLUMN warmup_start TEXT');
+}
 
 export function getSetting(key, createDefault) {
   const row = db.prepare('SELECT value FROM settings WHERE key = ?').get(key);
@@ -85,22 +93,40 @@ export const devices = {
 };
 
 export const messages = {
-  /** `jid` opsional: kirim langsung ke ID chat ini (tanpa cek nomor). */
-  enqueue(deviceId, to, body, jid = null) {
+  /**
+   * `jid` opsional: kirim langsung ke ID chat ini (tanpa cek nomor).
+   * `kind`: reply | api | manual | birthday | internal (lihat antiban.js). Default: ke ID chat = reply, lainnya = api.
+   */
+  enqueue(deviceId, to, body, jid = null, kind = null) {
     const r = db
-      .prepare('INSERT INTO messages (device_id, to_number, body, to_jid) VALUES (?, ?, ?, ?)')
-      .run(deviceId, to, body, jid);
+      .prepare('INSERT INTO messages (device_id, to_number, body, to_jid, kind) VALUES (?, ?, ?, ?, ?)')
+      .run(deviceId, to, body, jid, kind ?? (jid ? 'reply' : 'api'));
     return Number(r.lastInsertRowid);
   },
   get: (id) => db.prepare('SELECT * FROM messages WHERE id = ?').get(id),
-  nextPending: (deviceId) =>
-    db
-      .prepare("SELECT * FROM messages WHERE device_id = ? AND status = 'pending' ORDER BY id LIMIT 1")
-      .get(deviceId),
+  /** Pesan antre berikutnya. Balasan didahulukan; jenis di `blocked` (kuota habis) dilewati. */
+  nextPending(deviceId, blocked = []) {
+    const skip = blocked.length ? `AND kind NOT IN (${blocked.map(() => '?').join(',')})` : '';
+    return db
+      .prepare(
+        `SELECT * FROM messages WHERE device_id = ? AND status = 'pending' ${skip}
+          ORDER BY CASE kind WHEN 'reply' THEN 0 WHEN 'internal' THEN 0 WHEN 'api' THEN 1 ELSE 2 END, id LIMIT 1`
+      )
+      .get(deviceId, ...blocked);
+  },
+  /** Tandai pesan yang tertahan kuota (tetap antre, dikirim saat kuota tersedia lagi). */
+  markHeld(deviceId, kinds) {
+    if (!kinds.length) return;
+    db.prepare(
+      `UPDATE messages SET error = 'Menunggu kuota harian anti-banned (dikirim otomatis saat kuota tersedia)'
+        WHERE device_id = ? AND status = 'pending' AND error IS NULL AND kind IN (${kinds.map(() => '?').join(',')})`
+    ).run(deviceId, ...kinds);
+  },
   markSent: (id, waId = null) =>
     db
       .prepare("UPDATE messages SET status = 'sent', attempts = attempts + 1, error = NULL, sent_at = datetime('now'), wa_id = ? WHERE id = ?")
       .run(waId, id),
+  clearHeld: (id) => db.prepare("UPDATE messages SET error = NULL WHERE id = ? AND error LIKE 'Menunggu kuota%'").run(id),
   byWaId: (waId) => db.prepare('SELECT * FROM messages WHERE wa_id = ?').get(waId),
   markAttemptFailed(id, error, maxAttempts) {
     db.prepare(

@@ -18,6 +18,36 @@ sehingga RAM-nya kecil (± 100–150 MB + 20–60 MB per nomor).
 - Log pesan (terkirim / antrean / gagal) + tombol kirim ulang
 - Generator Apps Script untuk Google Form
 
+## Backup
+
+**Pengaturan → Backup.** Berisi database (kontak, tiket, pengaturan, API key AI),
+sesi login WhatsApp (tidak perlu scan ulang), dan `.env`.
+
+- Folder tujuan bebas; disarankan OneDrive/Google Drive atau drive lain (bukan C:).
+- Otomatis setiap hari pada jam yang diatur, menyimpan N backup terakhir.
+  Tombol **Backup sekarang** untuk manual.
+- **Pulihkan** dari dashboard (butuh PM2): kondisi sekarang dibackup dulu, server
+  restart, data diganti isi backup sebelum database dibuka. Data lama juga
+  disimpan di `data/_sebelum-pulih-<waktu>/`.
+- Folder backup berisi data sensitif (sesi WA, API key): jangan dibagikan.
+- Pindah PC: pasang WhatsOrbit, salin `env.backup` → `.env`, salin isi backup ke
+  `data/` (`whatsorbit.db` + folder `sessions`), lalu jalankan.
+
+## Anti-banned (semua fitur)
+
+**Pengaturan → Anti-banned.**
+
+| Jenis pesan | Contoh | Aturan |
+|---|---|---|
+| Balasan | Autoreply, Chat Bot, AI, CS, Pesan Masuk | Tidak dibatasi, didahulukan di antrean |
+| API | Google Form, aplikasi lain | Batas harian opsional (default tanpa batas) |
+| Dimulai oleh kita | Blast, Kirim Pesan, Ulang Tahun | Batas harian per device (default 200), jeda 15–45 detik; sisanya dikirim otomatis saat kuota tersedia |
+| Internal | Notifikasi ke petugas CS | Tidak dibatasi |
+
+Semua pesan: satu per satu per device, efek "sedang mengetik", nomor dicek
+terdaftar di WA. **Mode pemanasan** per device untuk nomor baru: batas
+20 → 40 → 80 → 150 → 250 per hari selama 4 minggu.
+
 ## Fitur bisa diaktif/nonaktifkan
 
 Menu **Pengaturan** di dashboard. Fitur yang nonaktif tidak tampil di menu,

@@ -16,6 +16,7 @@ export async function register({ router, wa, isEnabled, features }) {
       if (!isEnabled()) return null;
       const dt = t(deviceId);
       if (Date.now() < dt.nextAt) return null;
+      if (!wa.canInitiate(deviceId)) return null; // batas harian anti-banned per device (semua fitur)
       for (const c of campaigns.running()) {
         if (!c.device_ids.includes(deviceId)) continue;
         if (!inActiveHours(c)) continue;

@@ -94,7 +94,7 @@ export async function register({ router, wa, isEnabled }) {
 
   /** Pesan ke petugas (dicatat supaya balasan "kutip" bisa dikenali). */
   function toAgent(ticket, agent, text) {
-    const id = messages.enqueue(ticket.device_id, agent.phone, text, agent.jid?.endsWith('@s.whatsapp.net') ? agent.jid : null);
+    const id = messages.enqueue(ticket.device_id, agent.phone, text, agent.jid?.endsWith('@s.whatsapp.net') ? agent.jid : null, 'internal');
     db.prepare('INSERT OR REPLACE INTO cs_relay (message_id, ticket_id) VALUES (?, ?)').run(id, ticket.id);
     wa.drainQueue(ticket.device_id);
   }
@@ -213,7 +213,7 @@ export async function register({ router, wa, isEnabled }) {
     `• *#list* — chat terbuka Anda\n• *#off* / *#on* — berhenti / mulai bertugas (sekarang: ${agent.on_duty ? 'bertugas' : 'tidak bertugas'})`;
 
   function replyAgent(msg, agent, text) {
-    messages.enqueue(msg.deviceId, agent.phone, text, msg.chatJid);
+    messages.enqueue(msg.deviceId, agent.phone, text, msg.chatJid, 'internal');
     wa.drainQueue(msg.deviceId);
   }
 
