@@ -112,6 +112,7 @@ api.get('/status', (req, res) => {
 
 // Endpoint publik modul (tanpa API key), dipasang sebelum /api yang butuh API key
 app.use('/api/widget', features.requireFeature('widget'), features.publicRouter('widget'));
+app.use('/api/pay', features.requireFeature('payments'), features.publicRouter('payments'));
 app.use('/api', api);
 
 // Request lewat tunnel (ngrok / Cloudflare) selalu membawa X-Forwarded-For.
@@ -446,6 +447,7 @@ admin.use('/chatbots', features.requireFeature('chatbot'), features.featureRoute
 admin.use('/aibot', features.requireFeature('aibot'), features.featureRouter('aibot'));
 admin.use('/cs', features.requireFeature('cs'), features.featureRouter('cs'));
 admin.use('/webwa', features.requireFeature('webwa'), features.featureRouter('webwa'));
+admin.use('/payments', features.requireFeature('payments'), features.featureRouter('payments'));
 admin.use('/webhooks', features.requireFeature('webhook'), features.featureRouter('webhook'));
 admin.use('/greeter', features.requireFeature('greeter'), features.featureRouter('greeter'));
 admin.use('/autoreply', features.requireFeature('autoreply'), features.featureRouter('autoreply'));

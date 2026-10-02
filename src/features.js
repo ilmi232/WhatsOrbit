@@ -96,6 +96,13 @@ export const FEATURES = [
     load: () => import('./modules/widget.js'),
   },
   {
+    key: 'payments',
+    name: 'Integrasi Lynk.id / Mayar.id',
+    description: 'Terima notifikasi pembayaran Lynk.id & Mayar.id: WhatsApp terima kasih/pengingat ke pembeli, notifikasi admin, simpan ke Kontak.',
+    default: true,
+    load: () => import('./modules/payments.js'),
+  },
+  {
     key: 'webhook',
     name: 'Webhook',
     description: 'Teruskan pesan masuk, status kirim, status device, anggota grup, lead & tiket CS ke aplikasi lain (bertanda tangan, dengan kirim ulang otomatis).',

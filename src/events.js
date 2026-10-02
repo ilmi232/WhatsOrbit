@@ -5,6 +5,7 @@
 //   group.participants  anggota grup masuk/keluar/naik/turun admin
 //   lead.created        lead baru dari Google Form/Spreadsheet/API
 //   cs.ticket           tiket Customer Service dibuka/ditutup
+//   payment             notifikasi pembayaran Lynk.id / Mayar.id
 import { EventEmitter } from 'node:events';
 
 export const bus = new EventEmitter();

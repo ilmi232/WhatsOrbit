@@ -3,14 +3,11 @@ import { mountBackup } from './_backup.js';
 import { mountAntiban } from './_antiban.js';
 
 const FEATURE_ICON = {
-  api: 'code', contacts: 'users', leads: 'userplus', birthday: 'cake', widget: 'chat', chatbot: 'bot', aibot: 'sparkles', cs: 'headset', webwa: 'chat', greeter: 'users', webhook: 'webhook', sheets: 'list', inbox: 'inbox', autoreply: 'reply', formScript: 'form', blast: 'blast', messageLog: 'list',
+  api: 'code', contacts: 'users', leads: 'userplus', birthday: 'cake', widget: 'chat', chatbot: 'bot', aibot: 'sparkles', cs: 'headset', webwa: 'chat', greeter: 'users', webhook: 'webhook', payments: 'link', sheets: 'list', inbox: 'inbox', autoreply: 'reply', formScript: 'form', blast: 'blast', messageLog: 'list',
 };
 
 // Fitur Starsender yang belum ada di WhatsOrbit (rencana pengembangan)
 const ROADMAP = [
-  ['Otomasi', [
-    ['link', 'Integrasi Lynk.id / Mayar.id', 'Notifikasi pembayaran'],
-  ]],
   ['Premium', [
     ['link', 'Link Rotator', 'Satu link untuk beberapa nomor'],
   ]],

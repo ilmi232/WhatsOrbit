@@ -51,6 +51,7 @@ export const EVENTS = [
   { key: 'group.participants', label: 'Anggota grup', desc: 'Anggota masuk, keluar, dijadikan / dicabut admin.' },
   { key: 'lead.created', label: 'Lead baru', desc: 'Lead baru dari Google Form / Spreadsheet / API (fitur Daily Leads).' },
   { key: 'cs.ticket', label: 'Tiket Customer Service', desc: 'Tiket CS dibuka atau ditutup.' },
+  { key: 'payment', label: 'Pembayaran Lynk.id / Mayar.id', desc: 'Notifikasi pembayaran, pengingat bayar, dan membership dari Lynk.id / Mayar.id.' },
 ];
 const EVENT_KEYS = EVENTS.map((e) => e.key);
 

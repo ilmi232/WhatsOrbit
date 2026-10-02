@@ -174,6 +174,7 @@ const SAMPLE = {
   'device.status': { status: 'disconnected', phone: '6281111111111', reason: 'Connection Closed', code: 428, reconnecting: true },
   'group.participants': { groupJid: '1203630xxxxxxxx@g.us', groupName: 'Wali Murid Kelas 7A', action: 'add', participants: [{ jid: '6281234567890@s.whatsapp.net', phone: '6281234567890' }], author: '6281111111111@s.whatsapp.net' },
   'lead.created': { lead: { name: 'Budi', phone: '6281234567890', source: 'Form PPDB' }, contactId: 42, isNew: true, group: 'Leads PPDB' },
+  payment: { provider: 'mayar', event: 'payment.received', ref: 'a1b2c3d4-...', name: 'Budi', phone: '6281234567890', email: 'budi@contoh.id', product: 'Formulir PPDB 2027', amount: 250000, qty: 1, method: 'qris', status: 'paid' },
   'cs.ticket': { action: 'opened', ticketId: 17, chatJid: '6281234567890@s.whatsapp.net', phone: '6281234567890', name: 'Budi', agent: { id: 2, name: 'Bu Rina' }, source: 'chatbot' },
 };
 

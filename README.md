@@ -206,6 +206,25 @@ Menu **Group Greeter** (modul `src/modules/greeter.js`).
 - Peringatan kalau grup hanya mengizinkan admin mengirim pesan dan nomor
   sekolah bukan admin. Masuknya nomor sekolah sendiri tidak disapa.
 
+## Integrasi Lynk.id / Mayar.id
+
+Menu **Lynk.id / Mayar.id** (modul `src/modules/payments.js`). Salin URL webhook
+dari halaman ini ke dashboard Lynk.id / Mayar.id (Integrasi → Webhook).
+
+- URL berbentuk `<PUBLIC_URL>/api/pay/<lynk|mayar>/<token rahasia>`; token bisa dibuat ulang.
+- **Lynk.id**: tempel *Merchant Key* supaya header `X-Lynk-Signature`
+  (`sha256(grandTotal + refId + message_id + merchantKey)`) dicek; yang tidak cocok ditolak.
+  **Mayar.id** tidak bertanda tangan, jadi token di URL yang menjadi pengamannya.
+- Pesan WhatsApp otomatis ke pembeli: pembayaran berhasil, dan khusus Mayar juga
+  pengingat belum bayar (`[LinkBayar]`), member baru, membership berakhir.
+  Placeholder `[Nama] [Nomor] [Email] [Produk] [Total] [Jumlah] [Ref] [Tanggal]`, variasi `{a|b}`.
+- **Pesan per produk**: nama produk mengandung kata tertentu → pesan & grup kontak khusus.
+- Notifikasi ke nomor admin, simpan pembeli ke **Kontak** (grup bisa diatur).
+- Notifikasi yang sama tidak diproses dua kali (cek `refId`/`transactionId`).
+- Riwayat notifikasi (payload asli + pesan yang dikirim), **Proses ulang**, statistik
+  hari ini/bulan ini, dan tombol **Simulasi** untuk mencoba tanpa transaksi.
+- Diteruskan juga sebagai peristiwa `payment` di Webhook.
+
 ## Webhook
 
 Menu **Webhook** (modul `src/modules/webhook.js`). Meneruskan peristiwa WhatsOrbit
