@@ -141,7 +141,7 @@ const ARTICLES = [
 
   // ---- Incoming -------------------------------------------------------------------------------
   {
-    id: 'webwa', group: 'Incoming', icon: 'chat', title: 'Web WhatsApp', feature: 'webwa', menu: 'webwa',
+    id: 'webwa', group: 'Incoming', icon: 'chats', title: 'Web WhatsApp', feature: 'webwa', menu: 'webwa',
     summary: 'Baca & balas chat dari dashboard.',
     body: `
       ${tips(
@@ -266,7 +266,7 @@ const ARTICLES = [
 
   // ---- Integrasi ------------------------------------------------------------------------------
   {
-    id: 'widget', group: 'Integrasi', icon: 'chat', title: 'Chat Widget website', feature: 'widget', menu: 'widget',
+    id: 'widget', group: 'Integrasi', icon: 'widget', title: 'Chat Widget website', feature: 'widget', menu: 'widget',
     summary: 'Tombol WhatsApp melayang di website sekolah.',
     body: `
       ${steps(

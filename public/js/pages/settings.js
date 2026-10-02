@@ -3,7 +3,7 @@ import { mountBackup } from './_backup.js';
 import { mountAntiban } from './_antiban.js';
 
 const FEATURE_ICON = {
-  api: 'code', contacts: 'users', leads: 'userplus', birthday: 'cake', widget: 'chat', chatbot: 'bot', aibot: 'sparkles', cs: 'headset', webwa: 'chat', greeter: 'users', webhook: 'webhook', payments: 'link', sheets: 'sheet', inbox: 'inbox', autoreply: 'reply', formScript: 'form', blast: 'blast', messageLog: 'history',
+  api: 'code', contacts: 'users', leads: 'userplus', birthday: 'cake', widget: 'widget', chatbot: 'bot', aibot: 'sparkles', cs: 'headset', webwa: 'chats', greeter: 'users', webhook: 'webhook', payments: 'link', sheets: 'sheet', inbox: 'inbox', autoreply: 'reply', formScript: 'form', blast: 'blast', messageLog: 'history',
 };
 
 // Fitur Starsender yang belum ada di WhatsOrbit (rencana pengembangan)
