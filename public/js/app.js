@@ -36,6 +36,12 @@ const MENU = [
   { key: 'settings', label: 'Pengaturan', icon: 'settings', sub: 'Aktifkan fitur sesuai kebutuhan' },
 ];
 
+/** Navigasi bawah di HP: beranda + 3 menu pertama yang aktif dari daftar ini + tombol Menu. */
+const BOTTOM = [
+  ['webwa', 'Chat', 'chats'], ['inbox', 'Pesan', 'inbox'], ['send', 'Kirim', 'send'],
+  ['contacts', 'Kontak', 'users'], ['blast', 'Blast', 'blast'], ['messages', 'Log', 'history'],
+];
+
 const state = {
   info: null, // { version, publicUrl, features, memory, connected }
   devices: [],
@@ -50,6 +56,7 @@ const ctx = {
   call,
   toast,
   navigate: (key) => (location.hash = `#/${key}`),
+  menu: MENU,
   isOn: (feature) => !feature || !!state.info?.features?.[feature],
   async loadDevices() {
     state.devices = (await call('GET', '/admin/devices')).data;
@@ -96,6 +103,14 @@ function renderChrome() {
       <span class="ico">${icon(m.icon)}</span>${esc(m.label)}</a>`;
   }).join('');
 
+  // Navigasi bawah (HP)
+  const picks = BOTTOM.filter(([k]) => ctx.isOn(MENU.find((m) => m.key === k)?.feature)).slice(0, 3);
+  const items = [['dashboard', 'Beranda', 'home'], ...picks];
+  $('#bottomNav').innerHTML = items.map(([k, label, ic]) => `
+    <a class="bn-item ${k === active ? 'on' : ''}" href="#/${k}" aria-label="${label}">${icon(ic)}<span>${label}</span></a>`).join('')
+    + `<button class="bn-item ${items.some(([k]) => k === active) ? '' : 'on'}" id="bnMenu" aria-label="Semua menu">${icon('grid')}<span>Menu</span></button>`;
+  document.querySelector('.shell').classList.toggle('is-home', active === 'dashboard');
+
   const info = state.info;
   if (!info) return;
   $('#ramPill').innerHTML = `
@@ -105,6 +120,13 @@ function renderChrome() {
 
 $('#burger').addEventListener('click', () => $('.shell').classList.toggle('nav-open'));
 $('#nav').addEventListener('click', () => $('.shell').classList.remove('nav-open'));
+$('#navBackdrop').addEventListener('click', () => $('.shell').classList.remove('nav-open'));
+$('#backBtn').addEventListener('click', () => ctx.navigate('dashboard'));
+$('#bottomNav').addEventListener('click', (e) => {
+  if (e.target.closest('#bnMenu')) $('.shell').classList.toggle('nav-open');
+  else $('.shell').classList.remove('nav-open');
+});
+ctx.openMenu = () => $('.shell').classList.add('nav-open');
 $('#logoutBtn').addEventListener('click', async () => {
   await call('POST', '/admin/logout').catch(() => {});
   showLogin();

@@ -2,6 +2,60 @@ import { barChart, chip, esc, fmt, icon, ring, sparkline, timeAgo } from '../ui.
 
 let range = 'today';
 
+// Label pendek untuk ikon "Menu cepat" di HP
+const SHORT = {
+  send: 'Kirim', blast: 'Blast', contacts: 'Kontak', webwa: 'Chat', inbox: 'Pesan', cs: 'CS', chatbot: 'Chat Bot',
+  aibot: 'AI Bot', autoreply: 'Autoreply', form: 'Form', sheets: 'Sheet', greeter: 'Greeter', birthday: 'Ultah',
+  leads: 'Leads', widget: 'Widget', payments: 'Lynk/Mayar', webhook: 'Webhook', messages: 'Log',
+};
+
+const greeting = () => {
+  const h = new Date().getHours();
+  return h < 11 ? 'Selamat pagi' : h < 15 ? 'Selamat siang' : h < 18 ? 'Selamat sore' : 'Selamat malam';
+};
+
+const THEME_ICONS = `
+  <svg class="svg-icon theme-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+  <svg class="svg-icon theme-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`;
+
+/** Beranda versi HP: sapaan, judul besar, kartu device, menu cepat. Disembunyikan di layar lebar. */
+function mobileHome(s, ctx, pending) {
+  const devs = [...s.devices].sort((a, b) => (b.status === 'connected') - (a.status === 'connected'));
+  const d = devs[0];
+  const ok = d?.status === 'connected';
+  const quick = ctx.menu.filter((m) => SHORT[m.key] && ctx.isOn(m.feature)).slice(0, 10);
+  return `
+  <div class="m-home">
+    <div class="m-head">
+      <div class="avatar">A</div>
+      <div class="m-hello"><small>${greeting()},</small><b>Admin Semesta</b></div>
+      <button class="icon-btn" data-m="theme" aria-label="Ganti mode gelap/terang">${THEME_ICONS}</button>
+      <button class="icon-btn" data-m="logout" aria-label="Keluar">${icon('logout')}</button>
+    </div>
+    <h2 class="m-title"><b>${fmt(s.today.sent)}</b> pesan terkirim hari ini</h2>
+
+    <div class="m-sec"><h3>Device <span class="m-count">${s.devices.length}</span></h3><a href="#/devices">Lihat semua</a></div>
+    ${d ? `
+    <a class="m-dev ${devs.length > 1 ? 'stacked' : ''} ${ok ? '' : 'off'}" href="#/devices">
+      <div class="m-dev-top">
+        <span class="m-dev-ic">${icon('device')}</span>
+        <div class="m-dev-name"><b>${esc(d.name)}</b><small>${d.phone ? '+' + esc(d.phone) : 'Belum tertaut'}</small></div>
+        <span class="m-dev-act">${icon(ok ? 'check' : d.status === 'qr' ? 'qr' : 'power')}</span>
+      </div>
+      <div class="m-dev-strip">
+        <span>${icon(ok ? 'check' : 'x')} ${esc(ok ? 'Terkoneksi' : d.status === 'qr' ? 'Menunggu scan' : 'Tidak terkoneksi')}</span>
+        <i></i>
+        <span>${icon('clock')} Antrean ${fmt(pending)}</span>
+      </div>
+    </a>` : `<a class="m-dev off" href="#/devices"><div class="m-dev-top"><span class="m-dev-ic">${icon('plus')}</span><div class="m-dev-name"><b>Tambah device</b><small>Scan QR nomor WhatsApp sekolah</small></div></div></a>`}
+
+    <div class="m-sec"><h3>Menu cepat</h3><a href="#" data-m="menu">Lihat semua</a></div>
+    <div class="m-quick">
+      ${quick.map((m) => `<a href="#/${m.key}"><span>${icon(m.icon)}</span><small>${SHORT[m.key]}</small></a>`).join('')}
+    </div>
+  </div>`;
+}
+
 function view(s, ctx) {
   const days = s.last7;
   const sentSeries = days.map((d) => d.sent);
@@ -32,6 +86,7 @@ function view(s, ctx) {
 
   return `
   <div class="dash">
+    ${mobileHome(s, ctx, pending)}
     <div class="dash-kpis">
       <div class="kpi kpi-hero">
         <div class="kpi-k">Terkirim hari ini</div>
@@ -146,7 +201,21 @@ let last = null;
 async function load(el, ctx) {
   const { data } = await ctx.call('GET', '/admin/stats');
   last = data;
+  const quickX = el.querySelector('.m-quick')?.scrollLeft ?? 0; // jaga posisi geser saat refresh
   el.innerHTML = view(data, ctx);
+  const q = el.querySelector('.m-quick');
+  if (q) q.scrollLeft = quickX;
+  if (!el.dataset.mBound) {
+    el.dataset.mBound = '1';
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-m]');
+      if (!b) return;
+      e.preventDefault();
+      if (b.dataset.m === 'theme') document.querySelector('#themeBtn').click();
+      if (b.dataset.m === 'logout') document.querySelector('#logoutBtn').click();
+      if (b.dataset.m === 'menu') ctx.openMenu();
+    });
+  }
   el.querySelector('[data-range]')?.addEventListener('click', (e) => {
     const r = e.target.closest('button')?.dataset.r;
     if (!r) return;

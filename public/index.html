@@ -47,7 +47,8 @@
   <div class="main">
     <header class="topbar">
       <button class="icon-btn burger" id="burger" aria-label="Menu"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
-      <div>
+      <button class="icon-btn back-btn" id="backBtn" aria-label="Kembali ke Dashboard"><svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M11 18l-6-6 6-6"/></svg></button>
+      <div class="title-wrap">
         <h1 id="pageTitle">Dashboard</h1>
         <div class="sub" id="pageSub"></div>
       </div>
@@ -71,6 +72,8 @@
 
     <main id="page"></main>
   </div>
+  <div class="nav-backdrop" id="navBackdrop"></div>
+  <nav class="bottom-nav" id="bottomNav" aria-label="Navigasi utama"></nav>
 </div>
 
 <div id="toast" role="status"></div>

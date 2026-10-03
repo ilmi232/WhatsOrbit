@@ -148,9 +148,9 @@ export default {
           <button data-r="week">7 hari</button><button data-r="month">30 hari</button><button data-r="all">Semua</button>
         </div>
         <div class="row" style="flex-wrap:nowrap">
-          <input type="date" id="fFrom" aria-label="Dari tanggal" style="width:auto">
+          <input type="date" id="fFrom" aria-label="Dari tanggal" style="width:auto;min-width:0;flex:1">
           <span class="muted">s/d</span>
-          <input type="date" id="fTo" aria-label="Sampai tanggal" style="width:auto">
+          <input type="date" id="fTo" aria-label="Sampai tanggal" style="width:auto;min-width:0;flex:1">
         </div>
         <select id="fSource" style="width:auto" aria-label="Sumber"></select>
         <div class="search">${icon('search')}<input id="fQ" placeholder="Cari nama, nomor, atau data" aria-label="Cari lead"></div>
