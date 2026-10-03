@@ -152,6 +152,11 @@ Menu **AI Chat Bot** (modul `src/modules/aibot.js`, penyedia di `src/ai-provider
 | Server lain (kompatibel OpenAI, mis. Ollama) | tergantung | opsional |
 
 - API key disimpan di database lokal; dashboard hanya menampilkan `••••abcd`.
+- **Beberapa API key berurutan prioritas** (boleh campur penyedia, mis. Gemini A → Gemini B → Groq).
+  Key yang kena batas kuota (HTTP 429) diistirahatkan sesuai saran penyedia ("retry in 41s";
+  batas harian ±1 jam) dan pesan langsung dicoba dengan key berikutnya; key salah (401/403)
+  dilewati 6 jam. Tiap key punya status, jumlah pemakaian hari ini, tombol tes, pulihkan,
+  naik/turun, dan aktif/nonaktif. Key lama (satu per penyedia) otomatis dipindah ke daftar.
 - **Informasi Sekolah** = bahan jawaban; AI diminta tidak mengarang di luar itu.
 - Mode: jawab semua pertanyaan lain (setelah Chat Bot & kata kunci Autoreply;
   aturan Autoreply "Semua pesan" dilewati) atau hanya pesan berawalan (mis. `tanya`).

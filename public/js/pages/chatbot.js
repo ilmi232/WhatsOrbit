@@ -178,7 +178,7 @@ function render(el, ctx) {
           <div class="card-head"><div><h3>Pengaturan</h3></div></div>
           ${settingsHtml(ctx)}
         </div>
-        <div class="card" style="position:sticky;bottom:12px;z-index:2;padding:16px 24px">
+        <div class="card save-bar">
           <div class="row between">
             <span class="muted" id="saveState">${dirty ? 'Ada perubahan yang belum disimpan' : 'Semua perubahan tersimpan'}</span>
             <button class="btn grad" id="saveBot">${icon('check')} Simpan</button>

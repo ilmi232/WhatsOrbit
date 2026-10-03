@@ -202,6 +202,7 @@ const ARTICLES = [
         'Urutan penjawab: Chat Bot → Autoreply → AI. AI hanya menjawab chat pribadi.',
         'Kalau penanya minta bicara dengan admin, AI menyerahkan chat (ke CS kalau aktif) dan diam sementara.',
         'Penyedia lain: Groq, OpenRouter, OpenAI, Claude, atau server sendiri.',
+        '<b>Beberapa API key</b>: tambahkan lebih dari satu (mis. dari akun Google berbeda, atau Groq sebagai cadangan). Atur urutannya di kartu <b>Urutan API key</b>. Kalau key teratas habis kuota, AI otomatis memakai key berikutnya dan key itu diistirahatkan sampai kuotanya pulih.',
       )}
       ${note('Kuota gratis terbatas per menit/hari. Di paket gratis Gemini, Google dapat memakai isi percakapan, jadi <b>jangan</b> masukkan data pribadi siswa.', 'warn')}`,
   },

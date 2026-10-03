@@ -4,7 +4,7 @@ let S = null; // pengaturan tersimpan (key disamarkan)
 let P = {}; // daftar penyedia
 let defaultPrompt = '';
 let draft = null;
-let newKeys = {}; // key yang baru diketik (belum disimpan)
+let newKeys = {}; // key yang baru diketik di kolom tambah (belum ditambahkan)
 let dirty = false;
 let simLog = [];
 let ctxRef = null;
@@ -31,7 +31,7 @@ function providerCards() {
       <span class="prov-top"><b>${esc(title)}</b><span class="prov-tick">${icon('check')}</span></span>
       <span class="prov-sub">${esc(sub ?? '')}</span>
       <span class="prov-foot">${p.free ? chip('ok', 'Ada gratis') : chip('muted', 'Berbayar')}
-        ${S.keys[k] ? `<span class="prov-key">${icon('key')} tersimpan</span>` : ''}</span>
+        ${S.keyCount[k] ? `<span class="prov-key">${icon('key')} ${S.keyCount[k]} key</span>` : ''}</span>
     </label>`;
   }).join('');
 }
@@ -60,15 +60,17 @@ function modelHint(k) {
 function providerDetail() {
   const k = draft.provider;
   const p = P[k];
-  const saved = S.keys[k];
+  const n = S.keyCount[k] ?? 0;
   return `
     <div class="est" style="margin:0 0 14px">${esc(p.note)}</div>
-    <div class="field"><span>API key ${p.keyOptional ? '<span class="hint">— opsional</span>' : ''}</span>
-      <div class="row" style="flex-wrap:nowrap">
-        <input type="password" id="apiKey" autocomplete="off" placeholder="${saved ? `Tersimpan (${esc(saved)}) — isi untuk mengganti` : 'Tempel API key di sini'}" value="${esc(newKeys[k] ?? '')}">
-        ${saved ? `<button type="button" class="btn bad-soft sm" id="clearKey" title="Hapus API key">${icon('trash')}</button>` : ''}
+    <div class="field"><span>Tambah API key ${esc(PROV_LABEL[k]?.[0] ?? p.name)} ${p.keyOptional ? '<span class="hint">— opsional</span>' : n ? `<span class="hint">— sudah ada ${n}</span>` : ''}</span>
+      <div class="key-add">
+        <input type="password" id="apiKey" autocomplete="off" placeholder="Tempel API key di sini" value="${esc(newKeys[k] ?? '')}" aria-label="API key baru">
+        <input id="keyLabel" autocomplete="off" placeholder="Nama, mis. Akun Humas" aria-label="Nama key" maxlength="40">
+        <button type="button" class="btn soft sm" id="addKey">${icon('plus')} Tambah</button>
       </div>
-      ${p.keyUrl ? `<span class="hint">Belum punya? <a href="${esc(p.keyUrl)}" target="_blank" rel="noopener">Buat API key di sini ↗</a></span>` : ''}
+      <span class="hint">Boleh lebih dari satu (mis. dari akun Google berbeda); urutannya diatur di <b>Urutan API key</b>.
+        ${p.keyUrl ? `Belum punya? <a href="${esc(p.keyUrl)}" target="_blank" rel="noopener">Buat API key ↗</a>` : ''}</span>
     </div>
     ${p.kind === 'openai' ? `
       <label class="field"><span>Base URL</span>
@@ -87,6 +89,58 @@ function providerDetail() {
       <button type="button" class="btn grad" id="testConn">${icon('play')} Tes koneksi</button>
       <span class="muted" id="testOut"></span>
     </div>`;
+}
+
+const timeHM = (ms) => new Date(ms).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+
+function keyListHtml() {
+  const keys = S.keys;
+  if (!keys.length) {
+    return `<div class="muted">Belum ada API key. Pilih penyedia di atas, tempel key-nya, lalu klik <b>Tambah</b>.${P[draft.provider]?.keyOptional ? ' (Server lain boleh tanpa key.)' : ''}</div>`;
+  }
+  return keys.map((k, i) => {
+    const status = !k.enabled ? chip('muted', 'Nonaktif')
+      : k.resting ? chip('warn', `Istirahat s/d ${timeHM(k.resting.until)}`)
+      : chip('ok', 'Siap');
+    const sub = [
+      k.masked,
+      k.resting && k.enabled ? esc(k.resting.reason) : null,
+      k.used ? `dipakai ${fmt(k.used)}× hari ini` : null,
+    ].filter(Boolean).join(' · ');
+    return `
+    <div class="key-row ${k.enabled ? '' : 'off'}" data-key="${esc(k.id)}">
+      <span class="key-no">${i + 1}</span>
+      <div class="key-main">
+        <b>${esc(PROV_LABEL[k.provider]?.[0] ?? k.provider)}${k.label ? ` · ${esc(k.label)}` : ''}</b>
+        <small>${sub}${k.resting && k.enabled ? ' · <a href="#" data-k="reset">Pulihkan</a>' : ''}</small>
+      </div>
+      ${status}
+      <div class="key-acts">
+        <button type="button" class="btn ghost sm" data-k="up" title="Naikkan prioritas" ${i === 0 ? 'disabled' : ''}>${icon('up')}</button>
+        <button type="button" class="btn ghost sm" data-k="down" title="Turunkan prioritas" ${i === keys.length - 1 ? 'disabled' : ''}>${icon('down')}</button>
+        <button type="button" class="btn ghost sm" data-k="test" title="Tes key ini">${icon('play')}</button>
+        <label class="switch" title="${k.enabled ? 'Nonaktifkan' : 'Aktifkan'}"><input type="checkbox" data-k="toggle" ${k.enabled ? 'checked' : ''} aria-label="Key aktif"><i></i></label>
+        <button type="button" class="btn bad-soft sm" data-k="del" title="Hapus">${icon('trash')}</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderKeys(el) {
+  const box = $('#keyList', el);
+  if (box && !box.contains(document.activeElement)) box.innerHTML = keyListHtml();
+  const cards = $('#provCards', el);
+  if (cards) cards.innerHTML = providerCards();
+  const head = $('#aiPrimary', el);
+  if (head) head.textContent = primaryText();
+}
+
+function primaryText() {
+  const first = S.keys.find((k) => k.enabled);
+  if (!first) return P[S.provider]?.keyOptional ? `${P[S.provider].name} · tanpa key` : 'Belum ada API key aktif';
+  const model = S.models[first.provider] || P[first.provider]?.defaultModel || '-';
+  const n = S.keys.filter((k) => k.enabled).length;
+  return `${PROV_LABEL[first.provider]?.[0] ?? first.provider}${first.label ? ` (${first.label})` : ''} · ${model}${n > 1 ? ` · +${n - 1} key cadangan` : ''}`;
 }
 
 function settingsHtml(ctx) {
@@ -177,7 +231,7 @@ function render(el, ctx) {
           <div class="device-ico ${S.active ? 'on' : ''}">${icon('sparkles')}</div>
           <div>
             <b style="font-size:16px">${S.active ? 'AI Chat Bot aktif' : 'AI Chat Bot nonaktif'}</b>
-            <div class="muted">${esc(P[S.provider].name)} · ${esc(S.models[S.provider] || P[S.provider].defaultModel || '-')}</div>
+            <div class="muted" id="aiPrimary">${esc(primaryText())}</div>
           </div>
         </div>
         <div class="row" style="gap:22px">
@@ -200,6 +254,10 @@ function render(el, ctx) {
           <div id="provDetail">${providerDetail()}</div>
         </div>
         <div class="card">
+          <div class="card-head"><div><h3>Urutan API key</h3><p>Dipakai dari atas. Kalau satu key habis kuota atau salah, otomatis pindah ke key berikutnya.</p></div></div>
+          <div id="keyList">${keyListHtml()}</div>
+        </div>
+        <div class="card">
           <div class="card-head"><div><h3>Informasi Sekolah</h3><p>Bahan jawaban AI. AI diminta hanya menjawab dari sini dan tidak mengarang.</p></div></div>
           <textarea data-s="knowledge" style="min-height:260px" placeholder="Nama sekolah: ...
 Alamat: ...
@@ -212,7 +270,7 @@ Kontak admin: ...">${esc(draft.knowledge)}</textarea>
           <div class="card-head"><div><h3>Pengaturan</h3></div></div>
           ${settingsHtml(ctx)}
         </div>
-        <div class="card" style="position:sticky;bottom:12px;z-index:2;padding:16px 24px">
+        <div class="card save-bar">
           <div class="row between">
             <span class="muted" id="saveState">${dirty ? 'Ada perubahan yang belum disimpan' : 'Semua perubahan tersimpan'}</span>
             <button class="btn grad" id="saveAi">${icon('check')} Simpan</button>
@@ -239,7 +297,7 @@ Kontak admin: ...">${esc(draft.knowledge)}</textarea>
         <div class="card">
           <div class="card-head"><div><h3>Penting diketahui</h3></div></div>
           <ul class="muted" style="margin:0;padding-left:18px;line-height:1.8">
-            <li><b>Paket gratis</b> (Gemini, Groq, OpenRouter :free) punya batas per menit/hari. Kalau habis, AI gagal menjawab sampai kuota pulih.</li>
+            <li><b>Paket gratis</b> (Gemini, Groq, OpenRouter :free) punya batas per menit/hari. Tambahkan beberapa key: kalau satu habis, AI otomatis memakai key berikutnya.</li>
             <li>Di paket gratis Gemini, Google dapat memakai isi percakapan untuk meningkatkan layanannya. <b>Jangan</b> masukkan data pribadi siswa ke Informasi Sekolah.</li>
             <li>AI bisa salah. Isi Informasi Sekolah selengkap mungkin dan uji di simulator sebelum diaktifkan.</li>
             <li>Urutan: Chat Bot → Autoreply (kata kunci) → AI. AI hanya chat pribadi, bukan grup.</li>
@@ -251,7 +309,7 @@ Kontak admin: ...">${esc(draft.knowledge)}</textarea>
   renderSim(el);
   loadStats(el, ctx).catch(() => {});
   // Key sudah tersimpan -> muat daftar model otomatis (sekali per penyedia)
-  if ((S.keys[draft.provider] || P[draft.provider].keyOptional) && !modelLists[draft.provider]) $('#loadModels', el)?.click();
+  if ((S.keyCount[draft.provider] || P[draft.provider].keyOptional) && !modelLists[draft.provider]) $('#loadModels', el)?.click();
 }
 
 function markDirty(el) {
@@ -270,10 +328,16 @@ async function load(ctx) {
 }
 
 function payload() {
-  const keys = {};
-  for (const [k, v] of Object.entries(newKeys)) if (v) keys[k] = v;
-  const { keys: _ignored, active: _a, ...rest } = draft;
-  return { ...rest, keys };
+  const { keys: _k, keyCount: _c, active: _a, ...rest } = draft;
+  return rest;
+}
+
+/** Aksi daftar key: perbarui S (dan jumlah key di draft) tanpa membuang perubahan lain yang belum disimpan. */
+function applyKeys(el, data) {
+  S = { ...S, keys: data.keys, keyCount: data.keyCount, active: data.active };
+  draft.keys = data.keys;
+  draft.keyCount = data.keyCount;
+  renderKeys(el);
 }
 
 function bind(el, ctx) {
@@ -289,13 +353,58 @@ function bind(el, ctx) {
         ctx.toast('Tersimpan');
         return render(el, ctx);
       }
-      if (t.closest('#clearKey')) {
-        if (!(await confirmBox(`Hapus API key ${P[draft.provider].name}?`, '', { danger: true, okText: 'Hapus' }))) return;
-        const { data } = await ctx.call('PUT', '/admin/aibot/settings', { keys: { [draft.provider]: null }, ...(S.provider === draft.provider && S.active ? { active: false } : {}) });
-        S = { ...S, keys: data.keys, active: data.active };
-        draft.keys = data.keys;
-        ctx.toast('API key dihapus');
-        return render(el, ctx);
+      if (t.closest('#addKey')) {
+        const key = $('#apiKey', el).value.trim();
+        if (!key) return ctx.toast('Tempel API key dulu');
+        const { data } = await ctx.call('POST', '/admin/aibot/keys', { provider: draft.provider, key, label: $('#keyLabel', el).value });
+        newKeys[draft.provider] = '';
+        applyKeys(el, data);
+        $('#provDetail', el).innerHTML = providerDetail();
+        ctx.toast('API key ditambahkan');
+        if (!modelLists[draft.provider]) $('#loadModels', el)?.click();
+        return;
+      }
+      const kb = t.closest('[data-key] [data-k]');
+      if (kb && kb.dataset.k !== 'toggle') {
+        e.preventDefault();
+        const row = kb.closest('[data-key]');
+        const id = row.dataset.key;
+        const act = kb.dataset.k;
+        if (act === 'up' || act === 'down') {
+          const ids = S.keys.map((k) => k.id);
+          const i = ids.indexOf(id);
+          const j = act === 'up' ? i - 1 : i + 1;
+          if (j < 0 || j >= ids.length) return;
+          [ids[i], ids[j]] = [ids[j], ids[i]];
+          return applyKeys(el, (await ctx.call('PUT', '/admin/aibot/keys/order', { ids })).data);
+        }
+        if (act === 'del') {
+          const k = S.keys.find((x) => x.id === id);
+          if (!(await confirmBox(`Hapus API key ${k.label || k.masked}?`, S.active && S.keys.filter((x) => x.enabled).length === 1 && k.enabled ? 'Ini key aktif terakhir; AI Chat Bot akan dinonaktifkan.' : '', { danger: true, okText: 'Hapus' }))) return;
+          const { data } = await ctx.call('DELETE', `/admin/aibot/keys/${id}`);
+          applyKeys(el, data);
+          if (!data.active && S.active !== data.active) render(el, ctx);
+          return ctx.toast('API key dihapus');
+        }
+        if (act === 'reset') {
+          const { data } = await ctx.call('POST', `/admin/aibot/keys/${id}/reset`);
+          S.keys = data;
+          draft.keys = data;
+          return renderKeys(el);
+        }
+        if (act === 'test') {
+          kb.disabled = true;
+          try {
+            const { data } = await ctx.call('POST', `/admin/aibot/keys/${id}/test`);
+            ctx.toast(`Key berfungsi (${(data.ms / 1000).toFixed(1)} dtk, ${data.model})`);
+          } catch (err) {
+            ctx.toast(`Gagal: ${err.message}`);
+          } finally { kb.disabled = false; }
+          const { data } = await ctx.call('GET', '/admin/aibot/keys');
+          S.keys = data;
+          draft.keys = data;
+          return renderKeys(el);
+        }
       }
       if (t.closest('#loadModels')) {
         const btn = t.closest('#loadModels');
@@ -323,7 +432,10 @@ function bind(el, ctx) {
         out.textContent = 'Menghubungi AI…';
         try {
           const { data } = await ctx.call('POST', '/admin/aibot/test', { ...testBody(el), history: [{ role: 'user', text: 'Halo, tolong perkenalkan dirimu dalam satu kalimat.' }] });
-          out.innerHTML = `<span class="c-ok">Berhasil (${(data.ms / 1000).toFixed(1)} dtk, ${esc(data.model)}):</span> ${esc(data.text.slice(0, 160))}`;
+          out.innerHTML = `<span class="c-ok">Berhasil (${(data.ms / 1000).toFixed(1)} dtk, ${esc(data.model)} via ${esc(data.via)}):</span> ${esc(data.text.slice(0, 160))}`;
+          S.keys = (await ctx.call('GET', '/admin/aibot/keys')).data;
+          draft.keys = S.keys;
+          renderKeys(el);
         } catch (err) {
           out.innerHTML = `<span class="c-bad">Gagal: ${esc(err.message)}</span>`;
         }
@@ -356,7 +468,8 @@ function bind(el, ctx) {
 
   el.addEventListener('input', (e) => {
     const t = e.target;
-    if (t.id === 'apiKey') { newKeys[draft.provider] = t.value.trim(); return markDirty(el); }
+    if (t.id === 'apiKey') { newKeys[draft.provider] = t.value.trim(); return; }
+    if (t.id === 'keyLabel') return;
     if (t.id === 'model') { draft.models = { ...draft.models, [draft.provider]: t.value.trim() }; return markDirty(el); }
     if (t.id === 'baseUrl') { draft.baseUrls = { ...draft.baseUrls, [draft.provider]: t.value.trim() }; return markDirty(el); }
     const k = t.dataset.s;
@@ -393,6 +506,13 @@ function bind(el, ctx) {
       return markDirty(el);
     }
     if (t.matches('[data-dev]')) t.dispatchEvent(new Event('input', { bubbles: true }));
+    if (t.dataset.k === 'toggle') {
+      const id = t.closest('[data-key]').dataset.key;
+      try {
+        applyKeys(el, (await ctx.call('PATCH', `/admin/aibot/keys/${id}`, { enabled: t.checked })).data);
+      } catch (err) { t.checked = !t.checked; ctx.toast(err.message); }
+      return;
+    }
     if (t.id === 'aiActive') {
       const on = t.checked;
       if (on && dirty) { t.checked = false; return ctx.toast('Simpan perubahan dulu'); }
@@ -425,7 +545,7 @@ function bind(el, ctx) {
       simLog[simLog.length - 1] = {
         role: 'assistant',
         text: data.text || (data.refused ? '(AI menolak menjawab)' : '(kosong)'),
-        meta: `${(data.ms / 1000).toFixed(1)} dtk · ${data.usage.input + data.usage.output} token${data.admin ? ' · diserahkan ke admin' : ''}`,
+        meta: `${(data.ms / 1000).toFixed(1)} dtk · ${data.usage.input + data.usage.output} token · ${data.via}${data.admin ? ' · diserahkan ke admin' : ''}`,
       };
     } catch (err) {
       simLog[simLog.length - 1] = { role: 'assistant', text: `⚠️ ${err.message}`, error: true };
@@ -448,5 +568,11 @@ export default {
   async refresh(el, ctx) {
     if (document.querySelector('.modal-bg')) return;
     await loadStats(el, ctx);
+    const { data } = await ctx.call('GET', '/admin/aibot/keys');
+    if (JSON.stringify(data) !== JSON.stringify(S.keys)) {
+      S.keys = data;
+      draft.keys = data;
+      renderKeys(el);
+    }
   },
 };

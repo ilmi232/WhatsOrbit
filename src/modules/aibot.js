@@ -1,4 +1,5 @@
 // Modul AI Chat Bot: hanya dimuat kalau fitur "aibot" aktif.
+import { randomBytes } from 'node:crypto';
 import { db, devices, getSetting, messages, setSetting } from '../db.js';
 import { PROVIDERS, chat, listModels } from '../ai-providers.js';
 
@@ -41,7 +42,7 @@ export const DEFAULT_PROMPT =
 const DEFAULTS = {
   active: false,
   provider: 'gemini',
-  keys: {},        // { provider: apiKey }
+  keyList: [],     // [{ id, provider, key, label, enabled }] urutan = prioritas
   models: {},      // { provider: model }
   baseUrls: {},    // { provider: url } untuk penyedia kompatibel OpenAI
   prompt: DEFAULT_PROMPT,
@@ -58,15 +59,86 @@ const DEFAULTS = {
   errorText: '',
 };
 
+const newId = () => randomBytes(4).toString('hex');
+
 export function loadSettings() {
-  return { ...DEFAULTS, ...JSON.parse(getSetting('aibot', () => '{}')) };
+  const s = { ...DEFAULTS, ...JSON.parse(getSetting('aibot', () => '{}')) };
+  s.keyList = [...(s.keyList ?? [])]; // salinan, jangan ubah DEFAULTS
+  // Migrasi: dulu satu key per penyedia ({ keys: { gemini: '...' } }) -> daftar berurutan
+  if (s.keys && typeof s.keys === 'object') {
+    const old = Object.entries(s.keys).filter(([p, k]) => PROVIDERS[p] && k);
+    old.sort(([a], [b]) => (b === s.provider) - (a === s.provider));
+    s.keyList = [...(s.keyList ?? []), ...old.map(([provider, key]) => ({ id: newId(), provider, key, label: '', enabled: true }))];
+    delete s.keys;
+    setSetting('aibot', JSON.stringify(s));
+  }
+  return s;
 }
 
 const mask = (k) => (k ? `••••${k.slice(-4)}` : '');
 
+// ---- Status per API key (kuota habis, key salah, pemakaian hari ini) --------------------------
+const today = () => new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD waktu lokal
+let keyState = JSON.parse(getSetting('aibot_key_state', () => '{}'));
+const saveKeyState = () => setSetting('aibot_key_state', JSON.stringify(keyState));
+function stateOf(id) {
+  const st = keyState[id] ?? (keyState[id] = { until: 0, reason: '', day: today(), used: 0, fails: 0, lastOk: null });
+  if (st.day !== today()) Object.assign(st, { day: today(), used: 0, fails: 0 });
+  return st;
+}
+
+const REASON = { quota: 'kuota/batas habis', invalid: 'API key salah/dicabut', model: 'model tidak tersedia', error: 'gangguan server' };
+
+/** Detik tunggu yang disarankan penyedia: "retry in 41.9s", "try again in 1m30s", "retryDelay: 20s", "500ms". */
+function retryAfter(msg) {
+  const m = msg.match(/(?:retry(?:[ _-]?delay)?|try again|retry after)\D{0,15}((?:[\d.]+\s*(?:ms|h|m|s)\s*)+)/i);
+  if (!m) return 0;
+  let sec = 0;
+  for (const [, n, u] of m[1].matchAll(/([\d.]+)\s*(ms|h|m|s)/gi)) sec += Number(n) * ({ ms: 0.001, s: 1, m: 60, h: 3600 })[u.toLowerCase()];
+  return sec;
+}
+
+/** Jenis kegagalan & lama istirahat key. null = bukan masalah key (jangan pindah key). */
+function classify(err) {
+  const msg = String(err?.message ?? err);
+  const st = err?.status;
+  if (st === 429 || /quota|rate.?limit|resource.?exhausted|too many requests|kuota|batas pemakaian/i.test(msg)) {
+    const wait = retryAfter(msg);
+    const sec = wait ? Math.max(20, Math.ceil(wait)) : /per.?day|daily|harian/i.test(msg) ? 3600 : 60;
+    return { kind: 'quota', ms: sec * 1000 };
+  }
+  if (st === 401 || st === 403 || /api[ _-]?key|unauthori[sz]ed|permission/i.test(msg)) return { kind: 'invalid', ms: 6 * 3600_000 };
+  if (st === 404) return { kind: 'model', ms: 10 * 60_000 };
+  if (!st || st >= 500) {
+    if (/terpotong|MAX_TOKENS|Pilih model|tidak dikenal/i.test(msg)) return null; // masalah pengaturan, bukan key
+    return { kind: 'error', ms: 30_000 };
+  }
+  return null;
+}
+
+/** Urutan key yang dicoba. Penyedia tanpa key wajib (server sendiri) tetap bisa dipakai tanpa key. */
+function chainOf(s) {
+  const list = (s.keyList ?? []).filter((k) => k.enabled && PROVIDERS[k.provider]);
+  if (!list.length && PROVIDERS[s.provider]?.keyOptional) return [{ id: '_nokey', provider: s.provider, key: '', label: 'tanpa key', enabled: true }];
+  return list;
+}
+const modelFor = (s, provider) => s.models[provider] || PROVIDERS[provider]?.defaultModel || '';
+const keyName = (k) => `${PROVIDERS[k.provider]?.name ?? k.provider}${k.label ? ` (${k.label})` : ` ${mask(k.key)}`}`;
+
+function publicKey(k) {
+  const st = stateOf(k.id);
+  return {
+    id: k.id, provider: k.provider, label: k.label, enabled: k.enabled, masked: mask(k.key),
+    used: st.used, fails: st.fails, lastOk: st.lastOk,
+    resting: st.until > Date.now() ? { until: st.until, reason: REASON[st.reason] ?? st.reason } : null,
+  };
+}
+
 function publicSettings(s) {
-  const { keys, ...rest } = s;
-  return { ...rest, keys: Object.fromEntries(Object.keys(PROVIDERS).map((p) => [p, mask(keys[p])])) };
+  const { keyList, ...rest } = s;
+  const keyCount = {};
+  for (const k of keyList ?? []) keyCount[k.provider] = (keyCount[k.provider] ?? 0) + 1;
+  return { ...rest, keys: (keyList ?? []).map(publicKey), keyCount };
 }
 
 const num = (v, min, max, d) => {
@@ -78,15 +150,6 @@ function saveSettings(b) {
   const cur = loadSettings();
   const next = { ...cur };
   if (b.provider && PROVIDERS[b.provider]) next.provider = b.provider;
-  // API key: string berisi = ganti, null = hapus, tidak dikirim/kosong = tetap
-  if (b.keys && typeof b.keys === 'object') {
-    next.keys = { ...cur.keys };
-    for (const [p, k] of Object.entries(b.keys)) {
-      if (!PROVIDERS[p]) continue;
-      if (k === null) delete next.keys[p];
-      else if (typeof k === 'string' && k.trim() && !k.startsWith('••••')) next.keys[p] = k.trim();
-    }
-  }
   if (b.models && typeof b.models === 'object') next.models = { ...cur.models, ...Object.fromEntries(Object.entries(b.models).map(([p, m]) => [p, String(m ?? '').trim().slice(0, 120)])) };
   if (b.baseUrls && typeof b.baseUrls === 'object') {
     next.baseUrls = { ...cur.baseUrls };
@@ -115,17 +178,17 @@ function saveSettings(b) {
   if (b.active !== undefined) next.active = !!b.active;
   // Saat aktif, pengaturan harus lengkap (juga saat mengganti penyedia ketika AI sedang aktif)
   if (next.active) {
-    const p = PROVIDERS[next.provider];
     const suffix = b.active === undefined ? ', atau nonaktifkan AI dulu' : '';
-    if (!next.keys[next.provider] && !p.keyOptional) throw new Error(`Isi API key ${p.name} dulu${suffix}`);
-    if (!modelOf(next)) throw new Error(`Pilih model dulu${suffix}`);
+    const chain = chainOf(next);
+    if (!chain.length) throw new Error(`Tambahkan minimal satu API key yang aktif${suffix}`);
+    const noModel = [...new Set(chain.map((k) => k.provider))].filter((p) => !modelFor(next, p));
+    if (noModel.length) throw new Error(`Pilih model untuk ${noModel.map((p) => PROVIDERS[p].name).join(', ')} dulu${suffix}`);
     if (next.mode === 'prefix' && !next.prefix) throw new Error(`Isi kata awalan dulu${suffix}`);
   }
   setSetting('aibot', JSON.stringify(next));
   return next;
 }
 
-const modelOf = (s) => s.models[s.provider] || PROVIDERS[s.provider].defaultModel;
 
 function systemFor(s, name) {
   let sys = s.prompt;
@@ -134,20 +197,43 @@ function systemFor(s, name) {
   return sys;
 }
 
-/** Panggil AI dengan pengaturan + riwayat. Mengembalikan { text, admin, refused, usage }. */
-async function ask(s, history, name) {
-  const r = await chat({
-    provider: s.provider,
-    apiKey: s.keys[s.provider],
-    baseUrl: s.baseUrls[s.provider],
-    model: modelOf(s),
-    system: systemFor(s, name),
-    history,
-    maxTokens: s.maxTokens,
-    temperature: s.temperature,
-  });
-  const admin = r.text.includes(ADMIN_TAG);
-  return { ...r, text: r.text.replaceAll(ADMIN_TAG, '').trim(), admin };
+/**
+ * Panggil AI dengan pengaturan + riwayat, mencoba API key sesuai urutan prioritas.
+ * Key yang kena batas kuota / salah diistirahatkan sementara lalu pindah ke key berikutnya.
+ * Mengembalikan { text, admin, refused, usage, via, model }.
+ */
+async function ask(s, history, name, chain = chainOf(s)) {
+  if (!chain.length) throw new Error('Belum ada API key yang aktif');
+  const now = Date.now();
+  const ready = chain.filter((k) => stateOf(k.id).until <= now);
+  if (!ready.length) {
+    const soon = Math.min(...chain.map((k) => stateOf(k.id).until));
+    throw new Error(`Semua API key sedang istirahat (kuota habis). Paling cepat pulih ${new Date(soon).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}`);
+  }
+  const errors = [];
+  for (const k of ready) {
+    const model = modelFor(s, k.provider);
+    if (!model) { errors.push(`${keyName(k)}: model belum dipilih`); continue; }
+    const st = stateOf(k.id);
+    try {
+      const r = await chat({
+        provider: k.provider, apiKey: k.key, baseUrl: s.baseUrls[k.provider], model,
+        system: systemFor(s, name), history, maxTokens: s.maxTokens, temperature: s.temperature,
+      });
+      Object.assign(st, { used: st.used + 1, lastOk: new Date().toISOString(), until: 0, reason: '' });
+      saveKeyState();
+      const admin = r.text.includes(ADMIN_TAG);
+      return { ...r, text: r.text.replaceAll(ADMIN_TAG, '').trim(), admin, via: keyName(k), model };
+    } catch (err) {
+      const c = classify(err);
+      st.fails++;
+      if (!c) { saveKeyState(); throw err; }
+      Object.assign(st, { until: Date.now() + c.ms, reason: c.kind });
+      saveKeyState();
+      errors.push(`${keyName(k)}: ${err.message}`);
+    }
+  }
+  throw new Error(errors.length > 1 ? `Semua API key gagal — ${errors.join(' | ')}` : errors[0]);
 }
 
 function addUsage({ requests = 0, errors = 0, input = 0, output = 0 }) {
@@ -288,7 +374,7 @@ export async function register({ router, wa, isEnabled }) {
     try {
       const r = await listModels({
         provider,
-        apiKey: key && !key.startsWith('••••') ? key : s.keys[provider],
+        apiKey: key && !key.startsWith('••••') ? key : (s.keyList.find((k) => k.provider === provider && k.enabled) ?? s.keyList.find((k) => k.provider === provider))?.key,
         baseUrl: req.body?.baseUrl || s.baseUrls[provider],
       });
       res.json({ success: true, data: r.models, recommended: r.recommended });
@@ -302,7 +388,9 @@ export async function register({ router, wa, isEnabled }) {
     for (const k of ['provider', 'prompt', 'knowledge', 'temperature', 'maxTokens']) if (b[k] !== undefined) s[k] = b[k];
     if (b.model) s.models = { ...s.models, [s.provider]: b.model };
     if (b.baseUrl) s.baseUrls = { ...s.baseUrls, [s.provider]: b.baseUrl };
-    if (typeof b.apiKey === 'string' && b.apiKey.trim() && !b.apiKey.startsWith('••••')) s.keys = { ...s.keys, [s.provider]: b.apiKey.trim() };
+    // Key yang baru diketik (belum ditambahkan) -> uji key itu saja; selain itu pakai urutan key tersimpan
+    const typed = typeof b.apiKey === 'string' && b.apiKey.trim() && !b.apiKey.startsWith('••••')
+      ? [{ id: '_typed', provider: s.provider, key: b.apiKey.trim(), label: 'key baru', enabled: true }] : null;
     s.temperature = num(s.temperature, 0, 1.5, 0.3);
     s.maxTokens = num(s.maxTokens, 128, 8192, 1024);
     const history = (Array.isArray(b.history) ? b.history : [])
@@ -312,9 +400,9 @@ export async function register({ router, wa, isEnabled }) {
     if (!history.length || history[history.length - 1].role !== 'user') return fail(res, new Error('Pesan uji kosong'));
     const t0 = Date.now();
     try {
-      const r = await ask(s, history, 'Budi');
+      const r = await ask(s, history, 'Budi', typed ?? chainOf(s));
       addUsage({ requests: 1, input: r.usage.input, output: r.usage.output });
-      res.json({ success: true, data: { ...r, ms: Date.now() - t0, model: modelOf(s) } });
+      res.json({ success: true, data: { ...r, ms: Date.now() - t0 } });
     } catch (err) {
       addUsage({ requests: 1, errors: 1 });
       fail(res, err);
@@ -333,6 +421,94 @@ export async function register({ router, wa, isEnabled }) {
         GROUP BY a.chat_jid, a.device_id ORDER BY last_at DESC LIMIT 20`
     ).all();
     res.json({ success: true, data: { today, week: days, conversations: conv, lastError: JSON.parse(getSetting('aibot_last_error', () => 'null')) } });
+  });
+
+  // ---- Daftar API key (urutan = prioritas) -------------------------------------------
+  const store = (fn) => {
+    const s = loadSettings();
+    fn(s);
+    setSetting('aibot', JSON.stringify(s));
+    return publicSettings(s);
+  };
+  const findKey = (s, id) => {
+    const k = s.keyList.find((x) => x.id === id);
+    if (!k) throw new Error('API key tidak ditemukan');
+    return k;
+  };
+
+  router.get('/keys', (_req, res) => {
+    const s = loadSettings();
+    res.json({ success: true, data: s.keyList.map(publicKey) });
+  });
+
+  router.post('/keys', (req, res) => {
+    try {
+      const provider = String(req.body?.provider ?? '');
+      const key = String(req.body?.key ?? '').trim();
+      if (!PROVIDERS[provider]) throw new Error('Penyedia tidak dikenal');
+      if (key.length < 8) throw new Error('API key terlalu pendek');
+      res.json({ success: true, data: store((s) => {
+        if (s.keyList.some((k) => k.provider === provider && k.key === key)) throw new Error('API key ini sudah ada di daftar');
+        s.keyList.push({ id: newId(), provider, key, label: String(req.body?.label ?? '').trim().slice(0, 40), enabled: true });
+      }) });
+    } catch (err) { fail(res, err); }
+  });
+
+  router.patch('/keys/:id', (req, res) => {
+    try {
+      res.json({ success: true, data: store((s) => {
+        const k = findKey(s, req.params.id);
+        if (req.body?.label !== undefined) k.label = String(req.body.label).trim().slice(0, 40);
+        if (req.body?.enabled !== undefined) k.enabled = !!req.body.enabled;
+        if (s.active && !chainOf(s).length) throw new Error('Minimal satu API key harus aktif selama AI menyala');
+      }) });
+    } catch (err) { fail(res, err); }
+  });
+
+  router.delete('/keys/:id', (req, res) => {
+    try {
+      res.json({ success: true, data: store((s) => {
+        findKey(s, req.params.id);
+        s.keyList = s.keyList.filter((k) => k.id !== req.params.id);
+        if (s.active && !chainOf(s).length) s.active = false; // tidak ada key lagi -> AI berhenti
+        delete keyState[req.params.id];
+        saveKeyState();
+      }) });
+    } catch (err) { fail(res, err); }
+  });
+
+  router.put('/keys/order', (req, res) => {
+    try {
+      const ids = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+      res.json({ success: true, data: store((s) => {
+        const pos = new Map(ids.map((id, i) => [id, i]));
+        s.keyList.sort((a, b) => (pos.get(a.id) ?? 1e9) - (pos.get(b.id) ?? 1e9));
+      }) });
+    } catch (err) { fail(res, err); }
+  });
+
+  // Tes satu key dengan pertanyaan singkat (ikut memperbarui statusnya)
+  router.post('/keys/:id/test', async (req, res) => {
+    const s = loadSettings();
+    try {
+      const k = findKey(s, req.params.id);
+      stateOf(k.id).until = 0;
+      const t0 = Date.now();
+      const r = await ask({ ...s, maxTokens: Math.min(s.maxTokens, 1024) }, [{ role: 'user', text: 'Balas dengan satu kata: OK' }], '', [k]);
+      addUsage({ requests: 1, input: r.usage.input, output: r.usage.output });
+      res.json({ success: true, data: { ms: Date.now() - t0, model: r.model, text: r.text.slice(0, 80), key: publicKey(k) } });
+    } catch (err) {
+      addUsage({ requests: 1, errors: 1 });
+      fail(res, err);
+    }
+  });
+
+  // Pulihkan key yang sedang istirahat (mis. setelah kuota ditambah)
+  router.post('/keys/:id/reset', (req, res) => {
+    const st = stateOf(req.params.id);
+    Object.assign(st, { until: 0, reason: '' });
+    saveKeyState();
+    res.json({ success: true, data: loadSettings().keyList.map(publicKey) });
   });
 
   router.post('/resume', (req, res) => {
