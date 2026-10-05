@@ -7,7 +7,7 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString('id-ID', { day: 'numer
 let state = null;
 
 function html() {
-  const { settings: s, suggestions, items, last, listError } = state;
+  const { settings: s, suggestions, items, last, cloud, listError } = state;
   return `
     <div class="card-head">
       <div><h3>Backup</h3><p>Database, sesi login WhatsApp, dan .env</p></div>
@@ -22,6 +22,10 @@ function html() {
         <button type="button" class="btn ${x.cloud ? 'soft' : 'ghost'} sm" data-dir="${esc(x.dir)}" title="${esc(x.dir)}">${x.cloud ? '☁️ ' : ''}${esc(x.label)}</button>`).join('')}</div>` : ''}
       <span class="hint">Jangan di drive C: yang sama kalau bisa: kalau harddisk rusak, backup ikut hilang. Folder cloud (OneDrive/Google Drive) paling aman.</span>
     </label>
+    <label class="field"><span>Salinan Google Drive (rclone)</span>
+      <input id="bkCloud" value="${esc(s.cloud ?? '')}" placeholder="gdrive:WhatsOrbit-Backup">
+      <span class="hint">Setiap backup ikut diunggah ke sini (satu file .tar.gz). Isinya termasuk sesi login WhatsApp dan .env: jangan bagikan folder ini. Kosongkan kalau tidak perlu.</span>
+    </label>
     <div class="grid g-2" style="gap:12px">
       <label class="field"><span>Jam backup</span><input type="time" id="bkTime" value="${esc(s.time)}"></label>
       <label class="field"><span>Simpan berapa backup</span><input type="number" min="1" max="90" id="bkKeep" value="${s.keep}"></label>
@@ -29,10 +33,17 @@ function html() {
     <div class="row between">
       <span class="muted" id="bkState">${last ? (last.ok ? `Terakhir: ${when(last.at)} ✓` : `<span class="c-bad">Gagal ${when(last.at)}: ${esc(last.error)}</span>`) : 'Belum pernah backup'}</span>
       <div class="row">
+        ${s.cloud ? `<button class="btn ghost sm" id="bkTest">${icon('refresh')} Tes koneksi</button>` : ''}
         <button class="btn ghost sm" id="bkSave">${icon('check')} Simpan</button>
         <button class="btn grad sm" id="bkRun" ${s.dir ? '' : 'disabled'}>${icon('down')} Backup sekarang</button>
       </div>
     </div>
+    ${s.cloud ? `<div class="row" style="gap:8px;margin-top:8px"><span class="muted ${cloud && cloud.ok === false ? 'c-bad' : ''}" id="bkCloudState">${
+      !cloud ? 'Belum pernah diunggah ke Google Drive.'
+        : cloud.state === 'uploading' ? 'Sedang mengunggah ke Google Drive…'
+          : cloud.ok ? `Terunggah ke Google Drive ${when(cloud.at)} ✓ · ${cloud.count} backup tersimpan di sana`
+            : `Unggah ke Google Drive gagal: ${esc(cloud.error)}`}</span>${
+      cloud && cloud.ok === false ? `<button class="btn ghost sm" id="bkUpload">${icon('refresh')} Coba lagi</button>` : ''}</div>` : ''}
     ${listError ? `<div class="muted c-bad" style="margin-top:10px">${esc(listError)}</div>` : ''}
     ${items.length ? `
       <div class="label" style="margin:16px 0 6px">Backup tersimpan (${items.length})</div>
@@ -43,13 +54,17 @@ function html() {
         </div>`).join('')}` : ''}`;
 }
 
+let poll = null;
 async function load(card, ctx) {
   state = (await ctx.call('GET', '/admin/backup')).data;
   card.innerHTML = html();
+  // Selama unggahan ke cloud berjalan, perbarui status tiap 5 detik
+  clearTimeout(poll);
+  if (state.cloud?.state === 'uploading' && card.isConnected) poll = setTimeout(() => load(card, ctx).catch(() => {}), 5000);
 }
 
 async function save(card, ctx, extra = {}) {
-  const body = { dir: $('#bkDir', card).value, time: $('#bkTime', card).value, keep: Number($('#bkKeep', card).value), ...extra };
+  const body = { dir: $('#bkDir', card).value, cloud: $('#bkCloud', card).value, time: $('#bkTime', card).value, keep: Number($('#bkKeep', card).value), ...extra };
   await ctx.call('PUT', '/admin/backup/settings', body);
   await load(card, ctx);
 }
@@ -62,13 +77,19 @@ export async function mountBackup(card, ctx) {
       const pick = t.closest('[data-dir]');
       if (pick) { $('#bkDir', card).value = pick.dataset.dir; $('#bkState', card).textContent = 'Belum disimpan'; return; }
       if (t.closest('#bkSave')) { await save(card, ctx); ctx.toast('Pengaturan backup disimpan'); return; }
+      if (t.closest('#bkTest')) {
+        const { data } = await ctx.call('POST', '/admin/backup/test-cloud', { cloud: $('#bkCloud', card).value });
+        ctx.toast(`Terhubung ke ${data.cloud} (${data.count} backup tersimpan di sana)`);
+        return;
+      }
+      if (t.closest('#bkUpload')) { await ctx.call('POST', '/admin/backup/upload'); await load(card, ctx); return; }
       if (t.closest('#bkRun')) {
         const btn = t.closest('#bkRun');
         btn.disabled = true;
         $('#bkState', card).textContent = 'Membuat backup…';
         await save(card, ctx);
         const { data } = await ctx.call('POST', '/admin/backup/run');
-        ctx.toast(`Backup selesai (${size(data.sizeBytes)})`);
+        ctx.toast(state.settings.cloud ? `Backup selesai (${size(data.sizeBytes)}), sedang diunggah ke Google Drive` : `Backup selesai (${size(data.sizeBytes)})`);
         await load(card, ctx);
         return;
       }

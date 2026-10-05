@@ -1,4 +1,9 @@
 // Backup & pulihkan: database, sesi login WhatsApp, dan .env.
+//
+// Salinan cloud: kalau "cloud" diisi (remote rclone, mis. gdrive:WhatsOrbit-Backup), setiap backup yang
+// selesai dikemas jadi satu .tar.gz (sesi WhatsApp berisi ribuan file kecil yang lambat diunggah satu-satu),
+// diunggah di latar belakang, diperiksa, lalu hanya N backup terbaru yang disimpan di cloud.
+import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -13,7 +18,9 @@ export const DEFAULTS = {
   dir: '',
   time: '02:00',
   keep: 7,
+  cloud: '',
 };
+const CLOUD = /^[A-Za-z0-9_.-]+:[^\s"'|&<>]*$/; // remote rclone, mis. gdrive:WhatsOrbit-Backup
 
 export function loadSettings() {
   return { ...DEFAULTS, ...JSON.parse(getSetting('backup', () => '{}')) };
@@ -62,7 +69,9 @@ export function saveSettings(b) {
     dir: b.dir === undefined ? cur.dir : String(b.dir).trim(),
     time: /^([01]?\d|2[0-3]):[0-5]\d$/.test(b.time ?? '') ? b.time.padStart(5, '0') : cur.time,
     keep: Math.max(1, Math.min(90, Number.parseInt(b.keep ?? cur.keep, 10) || 7)),
+    cloud: b.cloud === undefined ? cur.cloud : String(b.cloud).trim().replace(/\/+$/, ''),
   };
+  if (next.cloud && !CLOUD.test(next.cloud)) throw new Error('Tujuan cloud harus nama remote rclone, mis. gdrive:WhatsOrbit-Backup');
   if (next.dir) next.dir = checkDir(next.dir);
   if (next.auto && !next.dir) throw new Error('Pilih folder tujuan backup dulu');
   setSetting('backup', JSON.stringify(next));
@@ -120,7 +129,102 @@ export function run(reason = 'manual', { prune = true } = {}) {
   // Simpan hanya N backup terbaru
   if (prune) for (const old of list(dir).slice(s.keep)) fs.rmSync(old.path, { recursive: true, force: true });
   setSetting('backup_last', JSON.stringify({ at: new Date().toISOString(), name, ok: true }));
+  // Unggah ke cloud di latar belakang (server tidak menunggu); hasilnya di cloudResult()
+  if (s.cloud) upload(name).catch(() => {});
   return list(dir).find((b) => b.name === name);
+}
+
+// ---- Salinan cloud lewat rclone ---------------------------------------------------------------
+/** rclone.exe dari folder winget (PATH proses PM2 belum tentu memuatnya), atau dari PATH. */
+function findRclone() {
+  const base = path.join(process.env.LOCALAPPDATA || '', 'Microsoft', 'WinGet', 'Packages');
+  try {
+    for (const pkg of fs.readdirSync(base).filter((n) => n.startsWith('Rclone.Rclone_'))) {
+      for (const d of fs.readdirSync(path.join(base, pkg)).sort().reverse()) {
+        const exe = path.join(base, pkg, d, 'rclone.exe');
+        if (fs.existsSync(exe)) return exe;
+      }
+    }
+  } catch { /* winget tidak ada */ }
+  return 'rclone';
+}
+
+/** Jalankan program tanpa shell (argumen aman), kembalikan { code, out, err }. */
+function exec(cmd, args, timeoutMs = 15 * 60_000) {
+  return new Promise((resolve) => {
+    let out = '';
+    let err = '';
+    let child;
+    try { child = spawn(cmd, args, { windowsHide: true }); } catch (e) { return resolve({ code: -1, out, err: e.message }); }
+    const timer = setTimeout(() => child.kill(), timeoutMs);
+    child.stdout.on('data', (d) => { out += d; });
+    child.stderr.on('data', (d) => { err += d; });
+    child.on('error', (e) => { clearTimeout(timer); resolve({ code: -1, out, err: e.code === 'ENOENT' ? `${path.basename(cmd)} tidak ditemukan` : e.message }); });
+    child.on('close', (code) => { clearTimeout(timer); resolve({ code: code ?? -1, out, err }); });
+  });
+}
+const rclone = (args, timeoutMs) => exec(findRclone(), args, timeoutMs);
+
+/** Pesan error yang bisa dibaca (baris ERROR terakhir, tanpa NOTICE). */
+function errorText(r) {
+  const lines = String(r.err || '').split(/\r?\n/).filter((l) => l.trim() && !/NOTICE/.test(l));
+  const line = lines.filter((l) => /ERROR|Failed|error/i.test(l)).pop() || lines.pop() || `keluar dengan kode ${r.code}`;
+  return line.replace(/^\d{4}\/\d\d\/\d\d \d\d:\d\d:\d\d\s*/, '').slice(0, 300);
+}
+
+const setCloud = (v) => setSetting('backup_cloud', JSON.stringify(v));
+export const cloudResult = () => JSON.parse(getSetting('backup_cloud', () => 'null'));
+
+let uploading = null;
+/** Kemas satu backup jadi .tar.gz, unggah, periksa hash, lalu hapus backup lama di cloud. */
+export async function upload(name) {
+  const s = loadSettings();
+  if (!s.cloud) return null;
+  if (uploading) await uploading.catch(() => {}); // satu unggahan dalam satu waktu
+  const job = (async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'whatsorbit-upload-'));
+    setCloud({ at: new Date().toISOString(), state: 'uploading', name });
+    try {
+      const archive = path.join(tmp, `${name}.tar.gz`);
+      // tar bawaan Windows (bsdtar); jangan tar Git/MSYS yang salah membaca alamat C:\
+      const tar = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe');
+      let r = await exec(tar, ['-czf', archive, '-C', s.dir, name], 5 * 60_000);
+      if (r.code) throw new Error(`Gagal mengemas backup: ${errorText(r)}`);
+      r = await rclone(['copy', tmp, s.cloud]);
+      if (r.code) throw new Error(errorText(r));
+      r = await rclone(['check', tmp, s.cloud, '--one-way']); // ukuran & hash harus sama
+      if (r.code) throw new Error(`Hasil unggahan tidak sama: ${errorText(r)}`);
+      r = await rclone(['lsf', s.cloud, '--files-only']);
+      if (r.code) throw new Error(errorText(r));
+      const all = r.out.split(/\r?\n/).filter((n) => n.startsWith(PREFIX) && n.endsWith('.tar.gz')).sort();
+      for (const old of all.slice(0, Math.max(0, all.length - s.keep))) {
+        const d = await rclone(['deletefile', `${s.cloud}/${old}`]);
+        if (d.code) throw new Error(`Gagal menghapus backup lama ${old}: ${errorText(d)}`);
+      }
+      const done = { at: new Date().toISOString(), ok: true, name, count: Math.min(all.length, s.keep), sizeBytes: fs.statSync(archive).size };
+      setCloud(done);
+      return done;
+    } catch (err) {
+      const failed = { at: new Date().toISOString(), ok: false, name, error: String(err.message).slice(0, 300) };
+      setCloud(failed);
+      return failed;
+    } finally {
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
+  })();
+  uploading = job;
+  try { return await job; } finally { if (uploading === job) uploading = null; }
+}
+
+/** Tes tujuan cloud: buat foldernya (kalau belum ada) lalu baca isinya. */
+export async function testCloud(cloud) {
+  const c = String(cloud ?? loadSettings().cloud).trim().replace(/\/+$/, '');
+  if (!c || !CLOUD.test(c)) throw new Error('Isi tujuan cloud dulu, mis. gdrive:WhatsOrbit-Backup');
+  let r = await rclone(['mkdir', c], 60_000);
+  if (r.code) throw new Error(errorText(r));
+  r = await rclone(['lsf', c, '--files-only'], 60_000);
+  if (r.code) throw new Error(errorText(r));
+  return { cloud: c, count: r.out.split(/\r?\n/).filter((n) => n.startsWith(PREFIX)).length };
 }
 
 /** Jadwalkan pemulihan: dijalankan saat server menyala berikutnya (lihat restore-boot.js). */

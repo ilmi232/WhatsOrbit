@@ -296,13 +296,27 @@ admin.get('/backup', (_req, res) => {
   let items = [];
   let listError = null;
   try { items = backup.list(s.dir); } catch (err) { listError = err.message; }
-  res.json({ success: true, data: { settings: s, suggestions: backup.suggestions(), items, last: backup.lastResult(), listError, pm2: process.env.pm_id !== undefined } });
+  res.json({ success: true, data: { settings: s, suggestions: backup.suggestions(), items, last: backup.lastResult(), cloud: backup.cloudResult(), listError, pm2: process.env.pm_id !== undefined } });
 });
 
 admin.put('/backup/settings', (req, res) => {
   try { res.json({ success: true, data: backup.saveSettings(req.body ?? {}) }); } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
+});
+
+admin.post('/backup/test-cloud', async (req, res) => {
+  try { res.json({ success: true, data: await backup.testCloud(req.body?.cloud) }); } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+});
+
+// Unggah ulang backup terakhir ke cloud (mis. setelah unggahan gagal)
+admin.post('/backup/upload', (_req, res) => {
+  const last = backup.lastResult();
+  if (!last?.ok) return res.status(400).json({ success: false, message: 'Belum ada backup yang berhasil' });
+  backup.upload(last.name).catch(() => {});
+  res.json({ success: true, data: { started: true, name: last.name } });
 });
 
 admin.post('/backup/run', (_req, res) => {

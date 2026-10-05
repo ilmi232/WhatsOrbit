@@ -32,6 +32,13 @@ sesi login WhatsApp (tidak perlu scan ulang), dan `.env`.
   restart, data diganti isi backup sebelum database dibuka. Data lama juga
   disimpan di `data/_sebelum-pulih-<waktu>/`.
 - Folder backup berisi data sensitif (sesi WA, API key): jangan dibagikan.
+- **Salinan Google Drive** (opsional): isi "Salinan Google Drive (rclone)" dengan remote
+  [rclone](https://rclone.org), mis. `gdrive:WhatsOrbit-Backup`. Setiap backup dikemas jadi satu
+  `.tar.gz` (sesi WA berisi ribuan file kecil), diunggah di latar belakang, diperiksa hash-nya, dan
+  hanya N terbaru yang disimpan. Pasang & login sekali: `winget install Rclone.Rclone`, lalu
+  `rclone config create gdrive drive scope=drive.file` (rclone hanya bisa melihat file yang ia unggah).
+  Memulihkan dari Drive: unduh `.tar.gz`, ekstrak (`tar -xzf <file>`) ke folder backup, lalu
+  **Pulihkan** dari dashboard.
 - Pindah PC: pasang WhatsOrbit, salin `env.backup` → `.env`, salin isi backup ke
   `data/` (`whatsorbit.db` + folder `sessions`), lalu jalankan.
 
