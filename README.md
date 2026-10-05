@@ -420,8 +420,17 @@ domain gratis (`ngrok http --url=<nama>.ngrok-free.app 3077`).
 ## Jalan otomatis saat PC menyala
 
 WhatsOrbit dan ngrok dijalankan oleh PM2 (lihat `ecosystem.config.cjs`) dan
-dihidupkan ulang saat login Windows oleh Task Scheduler **"WhatsOrbit (PM2)"**
-(`pm2 resurrect`, 30 detik setelah login).
+dihidupkan ulang oleh Task Scheduler **"WhatsOrbit (PM2)"** (`pm2 resurrect`).
+Semua aplikasi di daftar `pm2 save` ikut jalan (mis. aplikasi lain yang juga memakai PM2).
+
+Supaya tetap jalan setelah mati lampu **tanpa perlu login Windows**, klik ganda
+`autostart-pm2.cmd` dan pilih **Yes** saat Windows meminta izin Administrator.
+Task diubah menjadi "saat PC menyala" (1 menit setelah booting) dan berjalan
+walaupun belum ada yang login. Password Windows tidak disimpan (mode S4U).
+Setelah menambah atau menghapus aplikasi di PM2, jalankan `pm2 save` lagi.
+
+PC juga harus menyala sendiri saat listrik kembali: atur di BIOS, biasanya
+"Restore on AC Power Loss" / "AC Back" → **Power On**.
 
 | Mau apa | Klik ganda | Atau perintah |
 |---|---|---|
